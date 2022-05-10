@@ -25,6 +25,8 @@ jobs:
       # > before the plugin, as it uses the current rustc version as its cache key
       # https://github.com/Swatinem/rust-cache/tree/cb2cf0cc7c5198d3364b9630e2c3d457f160790c#example-usage
       - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: app
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
@@ -35,18 +37,19 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --check
+          args: --manifest-path app/Cargo.toml --all -- --check
 
       - name: Cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
+          args: --manifest-path app/Cargo.toml
 
       - name: Cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features
+          args: --manifest-path app/Cargo.toml --all-features
 
   build-image:
     name: Build docker image (and publish on master)
