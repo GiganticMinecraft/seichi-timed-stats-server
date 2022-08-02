@@ -77,9 +77,17 @@ pub(crate) mod infra_axum_handlers {
     use crate::domain::PlayerDataRepository;
     use crate::use_cases::GetAllPlayerDataUseCase;
     use axum::handler::Handler;
+    use axum::http::StatusCode;
     use std::sync::Arc;
 
-    mod presenter {}
+    mod presenter {
+        use crate::domain::KnownPlayerData;
+
+        pub fn present_player_data(_data: &KnownPlayerData) -> String {
+            // TODO: present player_data using Prometheus v2 style and return as response
+            "".to_string()
+        }
+    }
 
     pub fn handle_get_metrics(repository: &Arc<impl PlayerDataRepository>) -> impl Handler<()> {
         let use_case = GetAllPlayerDataUseCase {
@@ -87,8 +95,16 @@ pub(crate) mod infra_axum_handlers {
         };
 
         || async move {
-            let _player_data = use_case.get_all_known_player_data().await;
-            // TODO: present player_data using Prometheus v2 style and return as response
+            match use_case.get_all_known_player_data().await {
+                Ok(data) => (StatusCode::OK, presenter::present_player_data(&data)),
+                Err(e) => {
+                    tracing::error!("{:?}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string(),
+                    )
+                }
+            }
         }
     }
 }
