@@ -28,7 +28,7 @@ jobs:
       # https://github.com/Swatinem/rust-cache/tree/cb2cf0cc7c5198d3364b9630e2c3d457f160790c#example-usage
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: server/reader
+          working-directory: servers/reader
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
@@ -39,19 +39,19 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path server/reader/Cargo.toml --all -- --check
+          args: --manifest-path servers/reader/Cargo.toml --all -- --check
 
       - name: Cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --manifest-path server/reader/Cargo.toml
+          args: --manifest-path servers/reader/Cargo.toml
 
       - name: Cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path server/reader/Cargo.toml --all-features
+          args: --manifest-path servers/reader/Cargo.toml --all-features
 
   reader-build-image:
     name: Build reader docker image (and publish on master)
@@ -85,8 +85,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v3
         with:
-          context: ./server/reader
-          file: ./server/reader/Dockerfile
+          context: ./servers/reader
+          file: ./servers/reader/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -114,7 +114,7 @@ jobs:
       # https://github.com/Swatinem/rust-cache/tree/cb2cf0cc7c5198d3364b9630e2c3d457f160790c#example-usage
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: server/translator
+          working-directory: servers/translator
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
@@ -125,19 +125,19 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path server/translator/Cargo.toml --all -- --check
+          args: --manifest-path servers/translator/Cargo.toml --all -- --check
 
       - name: Cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --manifest-path server/translator/Cargo.toml
+          args: --manifest-path servers/translator/Cargo.toml
 
       - name: Cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path server/translator/Cargo.toml --all-features
+          args: --manifest-path servers/translator/Cargo.toml --all-features
 
   translator-build-image:
     name: Build translator docker image (and publish on master)
@@ -171,8 +171,8 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v3
         with:
-          context: ./server/translator
-          file: ./server/translator/Dockerfile
+          context: ./servers/translator
+          file: ./servers/translator/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ steps.meta.outputs.tags }}
