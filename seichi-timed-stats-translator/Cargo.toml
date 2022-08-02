@@ -1,5 +1,5 @@
 [package]
-name = "seichi-timed-stats-server"
+name = "seichi-timed-stats-translator"
 version = "0.1.0"
 edition = "2021"
 

@@ -54,7 +54,7 @@ jobs:
           args: --manifest-path seichi-timed-stats-reader/Cargo.toml --all-features
 
   reader-build-image:
-    name: Build docker image (and publish on master)
+    name: Build reader docker image (and publish on master)
     needs: [ reader-lint-and-test ]
     runs-on: ubuntu-20.04
     steps:
@@ -140,7 +140,7 @@ jobs:
           args: --manifest-path seichi-timed-stats-translator/Cargo.toml --all-features
 
   translator-build-image:
-    name: Build docker image (and publish on master)
+    name: Build translator docker image (and publish on master)
     needs: [ translator-lint-and-test ]
     runs-on: ubuntu-20.04
     steps:
