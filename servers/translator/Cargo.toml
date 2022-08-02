@@ -4,4 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+axum = "0.5.13"
+async-trait = "0.1.56"
+pbjson-types = "0.3.2"
+prost = "0.10.4"
 tokio = { version = "1.20.1", features = ["macros", "rt-multi-thread"] }
+tonic = { version = "0.7.2", features = ["compression"] }
+tracing-subscriber = "0.3.15"
+tracing = "0.1.36"
+anyhow = "1.0.59"
