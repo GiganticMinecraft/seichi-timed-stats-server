@@ -27,6 +27,6 @@ COPY --link . .
 RUN cargo build --release
 
 FROM gcr.io/distroless/cc
-LABEL org.opencontainers.image.source=https://github.com/GiganticMinecraft/seichi-timed-stats-server
-COPY --from=build-env --link /app/target/release/seichi-timed-stats-server /
-CMD ["./seichi-timed-stats-server"]
+LABEL org.opencontainers.image.source=https://github.com/GiganticMinecraft/seichi-timed-stats-translator
+COPY --from=build-env --link /app/target/release/seichi-timed-stats-translator /
+CMD ["./seichi-timed-stats-translator"]
