@@ -186,21 +186,21 @@ mod infra_repository_impls {
     use buf_generated::gigantic_minecraft::seichi_game_data::v1::read_service_client::ReadServiceClient;
     type GameDataGrpcClient = ReadServiceClient<tonic::transport::Channel>;
 
-    pub struct SeichiGameDataGrpcClient {
+    pub struct GameDataGrpcRepository {
         client: GameDataGrpcClient,
     }
 
-    impl SeichiGameDataGrpcClient {
-        pub async fn try_connect_with(
+    impl GameDataGrpcRepository {
+        pub async fn initialize_connections_with(
             config: config::GrpcClientConfig,
-        ) -> anyhow::Result<SeichiGameDataGrpcClient> {
+        ) -> anyhow::Result<GameDataGrpcRepository> {
             let client =
                 GameDataGrpcClient::connect(config.game_data_server_grpc_endpoint_url).await?;
 
-            Ok(SeichiGameDataGrpcClient { client })
+            Ok(GameDataGrpcRepository { client })
         }
 
-        pub(crate) fn cloned_inner(&self) -> GameDataGrpcClient {
+        pub(crate) fn game_data_client(&self) -> GameDataGrpcClient {
             self.client.clone()
         }
     }
@@ -212,10 +212,10 @@ mod infra_repository_impls {
     use crate::domain::{PlayerBreakCount, PlayerBuildCount, PlayerPlayTicks, PlayerVoteCount};
 
     #[async_trait::async_trait]
-    impl crate::domain::PlayerDataRepository for SeichiGameDataGrpcClient {
+    impl crate::domain::PlayerDataRepository for GameDataGrpcRepository {
         async fn get_all_break_counts(&self) -> anyhow::Result<Vec<PlayerBreakCount>> {
             Ok(self
-                .cloned_inner()
+                .game_data_client()
                 .break_counts(empty_request())
                 .await?
                 .into_inner()
@@ -227,7 +227,7 @@ mod infra_repository_impls {
 
         async fn get_all_build_counts(&self) -> anyhow::Result<Vec<PlayerBuildCount>> {
             Ok(self
-                .cloned_inner()
+                .game_data_client()
                 .build_counts(empty_request())
                 .await?
                 .into_inner()
@@ -239,7 +239,7 @@ mod infra_repository_impls {
 
         async fn get_all_play_ticks(&self) -> anyhow::Result<Vec<PlayerPlayTicks>> {
             Ok(self
-                .cloned_inner()
+                .game_data_client()
                 .play_ticks(empty_request())
                 .await?
                 .into_inner()
@@ -251,7 +251,7 @@ mod infra_repository_impls {
 
         async fn get_all_vote_counts(&self) -> anyhow::Result<Vec<PlayerVoteCount>> {
             Ok(self
-                .cloned_inner()
+                .game_data_client()
                 .vote_counts(empty_request())
                 .await?
                 .into_inner()
@@ -274,11 +274,13 @@ mod app {
 
         let repository = {
             let client_config = infra_repository_impls::config::GrpcClientConfig::from_env()?;
-            let client =
-                infra_repository_impls::SeichiGameDataGrpcClient::try_connect_with(client_config)
-                    .await?;
+            let repository =
+                infra_repository_impls::GameDataGrpcRepository::initialize_connections_with(
+                    client_config,
+                )
+                .await?;
 
-            Arc::new(client)
+            Arc::new(repository)
         };
 
         let app = {
