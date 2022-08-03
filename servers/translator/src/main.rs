@@ -2,7 +2,7 @@
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(clippy::cargo_common_metadata)]
 
-pub(crate) mod domain {
+mod domain {
     #[derive(Debug, Clone)]
     pub struct Player {
         pub uuid: String,
@@ -50,7 +50,7 @@ pub(crate) mod domain {
     }
 }
 
-pub(crate) mod use_cases {
+mod use_cases {
     use crate::domain::{KnownPlayerData, PlayerDataRepository};
     use std::sync::Arc;
 
@@ -71,7 +71,7 @@ pub(crate) mod use_cases {
     }
 }
 
-pub(crate) mod infra_axum_handlers {
+mod infra_axum_handlers {
     use crate::domain::PlayerDataRepository;
     use crate::use_cases::GetAllPlayerDataUseCase;
     use axum::handler::Handler;
@@ -107,7 +107,7 @@ pub(crate) mod infra_axum_handlers {
     }
 }
 
-pub(crate) mod infra_repository_impls {
+mod infra_repository_impls {
     #[allow(dead_code)]
     #[allow(clippy::nursery, clippy::pedantic)]
     mod buf_generated {
@@ -263,7 +263,7 @@ pub(crate) mod infra_repository_impls {
     }
 }
 
-pub(crate) mod app {
+mod app {
     use crate::infra_axum_handlers;
     use crate::infra_repository_impls;
     use std::sync::Arc;
