@@ -6,7 +6,6 @@ mod domain {
     #[derive(Debug, Clone)]
     pub struct Player {
         pub uuid: String,
-        pub last_known_name: String,
     }
 
     #[derive(Debug, Clone)]
@@ -132,10 +131,7 @@ mod infra_repository_impls {
         use crate::domain;
 
         fn into_domain_player(p: generated::Player) -> domain::Player {
-            domain::Player {
-                uuid: p.uuid,
-                last_known_name: p.last_known_name,
-            }
+            domain::Player { uuid: p.uuid }
         }
 
         fn extract_domain_player(
