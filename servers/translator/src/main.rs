@@ -3,6 +3,8 @@
 #![allow(clippy::cargo_common_metadata)]
 
 mod domain {
+    use std::fmt::Debug;
+
     #[derive(Debug, Clone)]
     pub struct Player {
         pub uuid: String,
@@ -41,7 +43,7 @@ mod domain {
     }
 
     #[async_trait::async_trait]
-    pub trait PlayerDataRepository: Sync + Send + 'static {
+    pub trait PlayerDataRepository: Debug + Sync + Send + 'static {
         async fn get_all_break_counts(&self) -> anyhow::Result<Vec<PlayerBreakCount>>;
         async fn get_all_build_counts(&self) -> anyhow::Result<Vec<PlayerBuildCount>>;
         async fn get_all_play_ticks(&self) -> anyhow::Result<Vec<PlayerPlayTicks>>;
@@ -53,12 +55,13 @@ mod use_cases {
     use crate::domain::{KnownPlayerData, PlayerDataRepository};
     use std::sync::Arc;
 
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct GetAllPlayerDataUseCase {
         pub repository: Arc<dyn PlayerDataRepository>,
     }
 
     impl GetAllPlayerDataUseCase {
+        #[tracing::instrument]
         pub async fn get_all_known_player_data(&self) -> anyhow::Result<KnownPlayerData> {
             Ok(KnownPlayerData {
                 break_counts: self.repository.get_all_break_counts().await?,
@@ -145,6 +148,7 @@ mod infra_axum_handlers {
             }
         }
 
+        #[tracing::instrument]
         pub fn present_player_data(data: &KnownPlayerData) -> anyhow::Result<BoxBody> {
             let collectors = Collectors::new()?;
 
@@ -241,6 +245,7 @@ mod infra_repository_impls {
             domain::Player { uuid: p.uuid }
         }
 
+        #[tracing::instrument]
         fn extract_domain_player(
             player: Option<generated::Player>,
         ) -> anyhow::Result<domain::Player> {
@@ -249,6 +254,7 @@ mod infra_repository_impls {
             Ok(into_domain_player(player))
         }
 
+        #[tracing::instrument]
         pub fn try_into_domain_player_break_count(
             value: generated::PlayerBreakCount,
         ) -> anyhow::Result<domain::PlayerBreakCount> {
@@ -258,6 +264,7 @@ mod infra_repository_impls {
             })
         }
 
+        #[tracing::instrument]
         pub fn try_into_domain_player_build_count(
             value: generated::PlayerBuildCount,
         ) -> anyhow::Result<domain::PlayerBuildCount> {
@@ -267,6 +274,7 @@ mod infra_repository_impls {
             })
         }
 
+        #[tracing::instrument]
         pub fn try_into_domain_player_play_ticks(
             value: generated::PlayerPlayTicks,
         ) -> anyhow::Result<domain::PlayerPlayTicks> {
@@ -276,6 +284,7 @@ mod infra_repository_impls {
             })
         }
 
+        #[tracing::instrument]
         pub fn try_into_domain_player_vote_count(
             value: generated::PlayerVoteCount,
         ) -> anyhow::Result<domain::PlayerVoteCount> {
@@ -289,11 +298,13 @@ mod infra_repository_impls {
     use buf_generated::gigantic_minecraft::seichi_game_data::v1::read_service_client::ReadServiceClient;
     type GameDataGrpcClient = ReadServiceClient<tonic::transport::Channel>;
 
+    #[derive(Debug)]
     pub struct GameDataGrpcRepository {
         client: GameDataGrpcClient,
     }
 
     impl GameDataGrpcRepository {
+        #[tracing::instrument]
         pub async fn initialize_connections_with(
             config: config::GrpcClientConfig,
         ) -> anyhow::Result<GameDataGrpcRepository> {
@@ -316,6 +327,7 @@ mod infra_repository_impls {
 
     #[async_trait::async_trait]
     impl crate::domain::PlayerDataRepository for GameDataGrpcRepository {
+        #[tracing::instrument]
         async fn get_all_break_counts(&self) -> anyhow::Result<Vec<PlayerBreakCount>> {
             Ok(self
                 .game_data_client()
@@ -328,6 +340,7 @@ mod infra_repository_impls {
                 .collect::<Result<_, _>>()?)
         }
 
+        #[tracing::instrument]
         async fn get_all_build_counts(&self) -> anyhow::Result<Vec<PlayerBuildCount>> {
             Ok(self
                 .game_data_client()
@@ -340,6 +353,7 @@ mod infra_repository_impls {
                 .collect::<Result<_, _>>()?)
         }
 
+        #[tracing::instrument]
         async fn get_all_play_ticks(&self) -> anyhow::Result<Vec<PlayerPlayTicks>> {
             Ok(self
                 .game_data_client()
@@ -352,6 +366,7 @@ mod infra_repository_impls {
                 .collect::<Result<_, _>>()?)
         }
 
+        #[tracing::instrument]
         async fn get_all_vote_counts(&self) -> anyhow::Result<Vec<PlayerVoteCount>> {
             Ok(self
                 .game_data_client()
