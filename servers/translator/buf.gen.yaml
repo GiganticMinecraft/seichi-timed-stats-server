@@ -12,6 +12,7 @@ plugins:
     out: src/gen
     # https://github.com/neoeinstein/protoc-gen-prost/tree/main/protoc-gen-tonic
     opt:
+      - no_server=true
       - compile_well_known_types
       - extern_path=.google.protobuf=::pbjson_types
   - remote: buf.build/prost/plugins/crate:v0.1.5-2
