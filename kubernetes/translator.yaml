@@ -26,7 +26,7 @@ spec:
         - resources:
             requests:
               memory: 64Mi
-            limit:
+            limits:
               # We need to prepare for some memory spikes when fetching all data
               memory: 2048Mi
           envFrom:
