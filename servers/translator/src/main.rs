@@ -73,33 +73,140 @@ mod use_cases {
 mod infra_axum_handlers {
     use crate::domain::PlayerDataRepository;
     use crate::use_cases::GetAllPlayerDataUseCase;
+    use axum::body;
     use axum::handler::Handler;
     use axum::http::StatusCode;
+    use axum::response::Response;
     use std::sync::Arc;
+
+    #[derive(Clone)]
+    pub struct SharedAppState {
+        pub repository: Arc<dyn PlayerDataRepository>,
+    }
 
     mod presenter {
         use crate::domain::KnownPlayerData;
+        use axum::body::{boxed, BoxBody};
+        use prometheus::core::{Collector, Desc};
+        use prometheus::proto::MetricFamily;
+        use prometheus::{Encoder, IntGaugeVec, Opts, TextEncoder};
+        use std::collections::HashMap;
 
-        pub fn present_player_data(_data: &KnownPlayerData) -> String {
-            // TODO: present player_data using Prometheus v2 style and return as response
-            "".to_string()
+        struct Collectors {
+            break_count: IntGaugeVec,
+            build_count: IntGaugeVec,
+            vote_count: IntGaugeVec,
+            play_ticks: IntGaugeVec,
+        }
+
+        impl Collectors {
+            fn new() -> anyhow::Result<Self> {
+                let break_count =
+                    IntGaugeVec::new(Opts::new("seichi_player_break_count", ""), &["uuid"])?;
+                let build_count =
+                    IntGaugeVec::new(Opts::new("seichi_player_build_count", ""), &["uuid"])?;
+                let vote_count =
+                    IntGaugeVec::new(Opts::new("seichi_player_vote_count", ""), &["uuid"])?;
+                let play_ticks =
+                    IntGaugeVec::new(Opts::new("seichi_player_play_ticks", ""), &["uuid"])?;
+
+                Ok(Collectors {
+                    break_count,
+                    build_count,
+                    vote_count,
+                    play_ticks,
+                })
+            }
+        }
+
+        impl Collector for Collectors {
+            fn desc(&self) -> Vec<&Desc> {
+                vec![
+                    self.break_count.desc(),
+                    self.build_count.desc(),
+                    self.vote_count.desc(),
+                    self.play_ticks.desc(),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
+            }
+
+            fn collect(&self) -> Vec<MetricFamily> {
+                vec![
+                    self.break_count.collect(),
+                    self.build_count.collect(),
+                    self.vote_count.collect(),
+                    self.play_ticks.collect(),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
+            }
+        }
+
+        pub fn present_player_data(data: &KnownPlayerData) -> anyhow::Result<BoxBody> {
+            let collectors = Collectors::new()?;
+
+            for record in &data.break_counts {
+                let uuid = record.player.uuid.as_str();
+                let metrics = collectors
+                    .break_count
+                    .with(&HashMap::from([("uuid", uuid)]));
+                metrics.set(record.break_count as i64);
+            }
+
+            for record in &data.build_counts {
+                let uuid = record.player.uuid.as_str();
+                let metrics = collectors
+                    .build_count
+                    .with(&HashMap::from([("uuid", uuid)]));
+                metrics.set(record.build_count as i64);
+            }
+
+            for record in &data.vote_counts {
+                let uuid = record.player.uuid.as_str();
+                let metrics = collectors.vote_count.with(&HashMap::from([("uuid", uuid)]));
+                metrics.set(record.vote_count as i64);
+            }
+
+            for record in &data.play_ticks {
+                let uuid = record.player.uuid.as_str();
+                let metrics = collectors.play_ticks.with(&HashMap::from([("uuid", uuid)]));
+                metrics.set(record.play_ticks as i64);
+            }
+
+            let mut buffer = vec![];
+
+            TextEncoder::new().encode(&collectors.collect(), &mut buffer)?;
+
+            Ok(boxed(String::from_utf8(buffer)?))
         }
     }
 
-    pub fn handle_get_metrics(repository: &Arc<impl PlayerDataRepository>) -> impl Handler<()> {
-        let use_case = GetAllPlayerDataUseCase {
-            repository: repository.clone(),
-        };
+    pub fn handle_get_metrics(state: SharedAppState) -> impl Handler<()> {
+        fn const_error_response() -> (StatusCode, Response) {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Response::new(
+                    body::boxed("Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string())),
+            )
+        }
 
         || async move {
-            match use_case.get_all_known_player_data().await {
-                Ok(data) => (StatusCode::OK, presenter::present_player_data(&data)),
+            let use_case = GetAllPlayerDataUseCase {
+                repository: state.repository.clone(),
+            };
+
+            match use_case
+                .get_all_known_player_data()
+                .await
+                .and_then(|known_player_data| presenter::present_player_data(&known_player_data))
+            {
+                Ok(response) => (StatusCode::OK, Response::new(response)),
                 Err(e) => {
                     tracing::error!("{:?}", e);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string(),
-                    )
+                    const_error_response()
                 }
             }
         }
@@ -261,6 +368,7 @@ mod infra_repository_impls {
 
 mod app {
     use crate::infra_axum_handlers;
+    use crate::infra_axum_handlers::SharedAppState;
     use crate::infra_repository_impls;
     use std::sync::Arc;
 
@@ -268,15 +376,19 @@ mod app {
         // initialize tracing
         tracing_subscriber::fmt::init();
 
-        let repository = {
-            let client_config = infra_repository_impls::config::GrpcClientConfig::from_env()?;
-            let repository =
-                infra_repository_impls::GameDataGrpcRepository::initialize_connections_with(
-                    client_config,
-                )
-                .await?;
+        let shared_state = {
+            let repository = {
+                let client_config = infra_repository_impls::config::GrpcClientConfig::from_env()?;
+                let repository =
+                    infra_repository_impls::GameDataGrpcRepository::initialize_connections_with(
+                        client_config,
+                    )
+                    .await?;
 
-            Arc::new(repository)
+                Arc::new(repository)
+            };
+
+            SharedAppState { repository }
         };
 
         let app = {
@@ -285,7 +397,7 @@ mod app {
             use axum::routing::get;
             use axum::Router;
 
-            Router::new().route("/metrics", get(handle_get_metrics(&repository)))
+            Router::new().route("/metrics", get(handle_get_metrics(shared_state.clone())))
         };
 
         let addr = {
