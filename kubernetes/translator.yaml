@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  labels:
+    app: seichi-timed-stats-server
+    component: translator
+  name: seichi-timed-stats-translator
+  annotations:
+    reloader.stakater.com/auto: "true"
+
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: seichi-timed-stats-server
+      component: translator
+  template:
+    metadata:
+      labels:
+        app: seichi-timed-stats-server
+        component: translator
+    spec:
+      containers:
+        - resources:
+            requests:
+              memory: 64Mi
+              # We need to prepare for some memory spikes when fetching all data
+              limit: 2048Mi
+          envFrom:
+            - configMapRef:
+                name: seichi-timed-stats-translator-config
+          image: ghcr.io/giganticminecraft/seichi-timed-stats-translator:sha-2a7a75d
+          name: seichi-timed-stats-translator
+          ports:
+            - containerPort: 80
+              name: metrics
+          startupProbe:
+            tcpSocket:
+              port: 80
+            # 最大20秒待つ
+            failureThreshold: 5
+            periodSeconds: 4
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seichi-timed-stats-translator-config
+data:
+  # Override this
+  GAME_DATA_SERVER_GRPC_ENDPOINT_URL: "https://example.com"
