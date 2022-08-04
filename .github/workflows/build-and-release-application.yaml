@@ -57,6 +57,9 @@ jobs:
     name: Build reader docker image (and publish on master)
     needs: [ reader-lint-and-test ]
     runs-on: ubuntu-20.04
+    concurrency:
+      group: "docker-build-reader"
+      cancel-in-progress: true
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -143,6 +146,9 @@ jobs:
     name: Build translator docker image (and publish on master)
     needs: [ translator-lint-and-test ]
     runs-on: ubuntu-20.04
+    concurrency:
+      group: "docker-build-translator"
+      cancel-in-progress: true
     steps:
       - name: checkout
         uses: actions/checkout@v3
