@@ -203,17 +203,19 @@ jobs:
       - name: Replace reader tag
         run: |
           sed -ri \
-              "s%(image: ghcr\.io/giganticminecraft/seichi-timed-stats-reader):sha-\w+%\1:${READER_TAG}%g" \
+              "s%image: ghcr\.io/giganticminecraft/seichi-timed-stats-reader:sha-\w+%image: ${READER_TAG}%g" \
               ./kubernetes/reader.yaml
         env:
+          # comma-separated list of [image name]:[tag], but docker-meta is only generating one tag (sha)
           READER_TAG: ${{ needs.reader_build_image.outputs.image_tag }}
 
       - name: Replace translator tag
         run: |
           sed -ri \
-              "s%(image: ghcr\.io/giganticminecraft/seichi-timed-stats-translator):sha-\w+%\1:${TRANSLATOR_TAG}%g" \
+              "s%image: ghcr\.io/giganticminecraft/seichi-timed-stats-translator:sha-\w+%image: ${TRANSLATOR_TAG}%g" \
               ./kubernetes/translator.yaml
         env:
+          # comma-separated list of [image name]:[tag], but docker-meta is only generating one tag (sha)
           TRANSLATOR_TAG: ${{ needs.translator_build_image.outputs.image_tag }}
 
       - name: Commit & Push changes
