@@ -386,10 +386,19 @@ mod app {
     use crate::infra_axum_handlers::SharedAppState;
     use crate::infra_repository_impls;
     use std::sync::Arc;
+    use tower_http::trace::TraceLayer;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
 
     pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // initialize tracing
-        tracing_subscriber::fmt::init();
+        // see https://github.com/tokio-rs/axum/blob/79a0a54bc9f0f585c974b5e6793541baff980662/examples/tracing-aka-logging/src/main.rs
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::EnvFilter::new(
+                std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
+            ))
+            .with(tracing_subscriber::fmt::layer())
+            .init();
 
         let shared_state = {
             let repository = {
@@ -412,7 +421,9 @@ mod app {
             use axum::routing::get;
             use axum::Router;
 
-            Router::new().route("/metrics", get(handle_get_metrics(shared_state.clone())))
+            Router::new()
+                .route("/metrics", get(handle_get_metrics(shared_state.clone())))
+                .layer(TraceLayer::new_for_http())
         };
 
         let addr = {
@@ -420,7 +431,7 @@ mod app {
             SocketAddr::from(([0, 0, 0, 0], 80))
         };
 
-        tracing::debug!("listening on {}", addr);
+        tracing::info!("listening on {}", addr);
 
         Ok(axum::Server::bind(&addr)
             .serve(app.into_make_service())

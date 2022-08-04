@@ -52,3 +52,4 @@ metadata:
 data:
   # Override this
   GAME_DATA_SERVER_GRPC_ENDPOINT_URL: "https://example.com"
+  RUST_LOG: "info"
