@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  labels:
+    app: seichi-timed-stats-server
+    component: reader
+  name: seichi-timed-stats-reader
+  annotations:
+    reloader.stakater.com/auto: "true"
+
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: seichi-timed-stats-server
+      component: reader
+  template:
+    metadata:
+      labels:
+        app: seichi-timed-stats-server
+        component: reader
+    spec:
+      containers:
+        - resources:
+            requests:
+              memory: 64Mi
+            limits:
+              # We need to prepare for some memory spikes when fetching all data
+              memory: 2048Mi
+          envFrom:
+            - configMapRef:
+                name: seichi-timed-stats-reader-config
+          image: ghcr.io/giganticminecraft/seichi-timed-stats-reader:sha-610dd8b
+          name: seichi-timed-stats-reader
+          ports:
+            - containerPort: 80
+              name: api
+          startupProbe:
+            tcpSocket:
+              port: 80
+            # 最大20秒待つ
+            failureThreshold: 5
+            periodSeconds: 4
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seichi-timed-stats-reader-config
+data:
+  # Override this
+  INFLUXDB_ENDPOINT_URL: "https://example.com"
