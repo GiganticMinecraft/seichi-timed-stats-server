@@ -53,10 +53,12 @@ jobs:
           command: test
           args: --manifest-path servers/reader/Cargo.toml --all-features
 
-  reader-build-image:
+  reader_build_image:
     name: Build reader docker image (and publish on master)
     needs: [ reader-lint-and-test ]
     runs-on: ubuntu-20.04
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
       group: "docker-build-reader"
       cancel-in-progress: true
@@ -82,7 +84,6 @@ jobs:
           images: ${{ env.READER_IMAGE }}
           tags: |
             type=sha,prefix=sha-,suffix=,format=short
-            type=schedule,pattern={{date 'YYYYMMDD'}}
 
       - name: Build (and push if on master)
         id: docker_build
@@ -142,10 +143,12 @@ jobs:
           command: test
           args: --manifest-path servers/translator/Cargo.toml --all-features
 
-  translator-build-image:
+  translator_build_image:
     name: Build translator docker image (and publish on master)
     needs: [ translator-lint-and-test ]
     runs-on: ubuntu-20.04
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
       group: "docker-build-translator"
       cancel-in-progress: true
@@ -171,7 +174,6 @@ jobs:
           images: ${{ env.TRANSLATOR_IMAGE }}
           tags: |
             type=sha,prefix=sha-,suffix=,format=short
-            type=schedule,pattern={{date 'YYYYMMDD'}}
 
       - name: Build (and push if on master)
         id: docker_build
@@ -186,3 +188,37 @@ jobs:
           cache-from: type=gha
           # すべてのビルドステージのすべてのレイヤーをキャッシュして欲しいのでmode=max
           cache-to: type=gha,mode=max
+
+  update-kubernetes-image-tags:
+    name: Updates Kubernetes image tags
+    needs: [ reader_build_image, translator_build_image ]
+    runs-on: ubuntu-22.04
+    concurrency:
+      group: "update-kubernetes-image-tags"
+    if: ${{ github.ref == 'refs/heads/master' }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: Replace reader tag
+        run: |
+          sed -ri \
+              "s%(image: ghcr\.io/giganticminecraft/seichi-timed-stats-reader):sha-\w+%\1:${READER_TAG}%g" \
+              ./kubernetes/reader.yaml
+        env:
+          READER_TAG: ${{ needs.reader_build_image.outputs.image_tag }}
+
+      - name: Replace translator tag
+        run: |
+          sed -ri \
+              "s%(image: ghcr\.io/giganticminecraft/seichi-timed-stats-translator):sha-\w+%\1:${TRANSLATOR_TAG}%g" \
+              ./kubernetes/translator.yaml
+        env:
+          TRANSLATOR_TAG: ${{ needs.translator_build_image.outputs.image_tag }}
+
+      - name: Commit & Push changes
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "master"
+          message: "chore(kubernetes): update server components' image tags"
