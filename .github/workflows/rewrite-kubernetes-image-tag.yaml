@@ -3,7 +3,7 @@ name: Rewrite Tags
 on:
   registry_package:
     types:
-      - "published"
+      - "updated"
 
 jobs:
   rewrite_tags:
