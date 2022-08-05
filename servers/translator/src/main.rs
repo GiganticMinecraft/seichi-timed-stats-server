@@ -79,10 +79,10 @@ mod infra_axum_handlers {
     use axum::body;
     use axum::handler::Handler;
     use axum::http::StatusCode;
-    use axum::response::Response;
+    use axum::response::{IntoResponse, Response};
     use std::sync::Arc;
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct SharedAppState {
         pub repository: Arc<dyn PlayerDataRepository>,
     }
@@ -197,7 +197,8 @@ mod infra_axum_handlers {
             )
         }
 
-        || async move {
+        #[tracing::instrument]
+        async fn handler(state: &SharedAppState) -> Response {
             let use_case = GetAllPlayerDataUseCase {
                 repository: state.repository.clone(),
             };
@@ -207,13 +208,15 @@ mod infra_axum_handlers {
                 .await
                 .and_then(|known_player_data| presenter::present_player_data(&known_player_data))
             {
-                Ok(response) => (StatusCode::OK, Response::new(response)),
+                Ok(response) => (StatusCode::OK, Response::new(response)).into_response(),
                 Err(e) => {
                     tracing::error!("{:?}", e);
-                    const_error_response()
+                    const_error_response().into_response()
                 }
             }
         }
+
+        || async move { handler(&state).await }
     }
 }
 
