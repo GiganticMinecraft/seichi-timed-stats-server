@@ -188,15 +188,16 @@ mod infra_axum_handlers {
         }
     }
 
-    pub fn handle_get_metrics(state: SharedAppState) -> impl Handler<()> {
-        fn const_error_response() -> (StatusCode, Response) {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Response::new(
-                    body::boxed("Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string())),
-            )
-        }
+    fn const_error_response() -> (StatusCode, Response) {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Response::new(
+                body::boxed("Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string())),
+        )
+    }
 
+    pub fn handle_get_metrics(state: SharedAppState) -> impl Handler<()> {
+        // we need a separate handler function to create an error tracing span
         #[tracing::instrument]
         async fn handler(state: &SharedAppState) -> Response {
             let use_case = GetAllPlayerDataUseCase {
