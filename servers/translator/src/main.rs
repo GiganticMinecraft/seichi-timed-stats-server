@@ -34,7 +34,7 @@ mod domain {
         pub vote_count: u64,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct KnownPlayerData {
         pub break_counts: Vec<PlayerBreakCount>,
         pub build_counts: Vec<PlayerBuildCount>,
@@ -103,14 +103,34 @@ mod infra_axum_handlers {
 
         impl Collectors {
             fn new() -> anyhow::Result<Self> {
-                let break_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_break_count", ""), &["uuid"])?;
-                let build_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_build_count", ""), &["uuid"])?;
-                let vote_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_vote_count", ""), &["uuid"])?;
-                let play_ticks =
-                    IntGaugeVec::new(Opts::new("seichi_player_play_ticks", ""), &["uuid"])?;
+                let break_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_break_count",
+                        "Metrics of player's break counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let build_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_build_count",
+                        "Metrics of player's build counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let vote_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_vote_count",
+                        "Metrics of player's vote counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let play_ticks = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_play_ticks",
+                        "Metrics of player's play-tick counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
 
                 Ok(Collectors {
                     break_count,
@@ -181,10 +201,10 @@ mod infra_axum_handlers {
                 metrics.set(record.play_ticks as i64);
             }
 
+            let metrics_family = collectors.collect();
+
             let mut buffer = vec![];
-
-            TextEncoder::new().encode(&collectors.collect(), &mut buffer)?;
-
+            TextEncoder::new().encode(&metrics_family, &mut buffer)?;
             Ok(String::from_utf8(buffer)?)
         }
     }
