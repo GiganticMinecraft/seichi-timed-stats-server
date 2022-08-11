@@ -89,7 +89,6 @@ mod infra_axum_handlers {
 
     mod presenter {
         use crate::domain::KnownPlayerData;
-        use axum::body::{boxed, BoxBody};
         use prometheus::core::{Collector, Desc};
         use prometheus::proto::MetricFamily;
         use prometheus::{Encoder, IntGaugeVec, Opts, TextEncoder};
@@ -149,7 +148,9 @@ mod infra_axum_handlers {
         }
 
         #[tracing::instrument]
-        pub fn present_player_data(data: &KnownPlayerData) -> anyhow::Result<BoxBody> {
+        pub fn present_player_data_as_prometheus_metrics(
+            data: &KnownPlayerData,
+        ) -> anyhow::Result<String> {
             let collectors = Collectors::new()?;
 
             for record in &data.break_counts {
@@ -184,7 +185,7 @@ mod infra_axum_handlers {
 
             TextEncoder::new().encode(&collectors.collect(), &mut buffer)?;
 
-            Ok(boxed(String::from_utf8(buffer)?))
+            Ok(String::from_utf8(buffer)?)
         }
     }
 
@@ -207,9 +208,12 @@ mod infra_axum_handlers {
             match use_case
                 .get_all_known_player_data()
                 .await
-                .and_then(|known_player_data| presenter::present_player_data(&known_player_data))
-            {
-                Ok(response) => (StatusCode::OK, Response::new(response)).into_response(),
+                .and_then(|known_player_data| {
+                    presenter::present_player_data_as_prometheus_metrics(&known_player_data)
+                }) {
+                Ok(metrics_presentation) => {
+                    (StatusCode::OK, Response::new(metrics_presentation)).into_response()
+                }
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     const_error_response().into_response()
