@@ -34,7 +34,7 @@ mod domain {
         pub vote_count: u64,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct KnownPlayerData {
         pub break_counts: Vec<PlayerBreakCount>,
         pub build_counts: Vec<PlayerBuildCount>,
@@ -89,7 +89,6 @@ mod infra_axum_handlers {
 
     mod presenter {
         use crate::domain::KnownPlayerData;
-        use axum::body::{boxed, BoxBody};
         use prometheus::core::{Collector, Desc};
         use prometheus::proto::MetricFamily;
         use prometheus::{Encoder, IntGaugeVec, Opts, TextEncoder};
@@ -104,14 +103,34 @@ mod infra_axum_handlers {
 
         impl Collectors {
             fn new() -> anyhow::Result<Self> {
-                let break_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_break_count", ""), &["uuid"])?;
-                let build_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_build_count", ""), &["uuid"])?;
-                let vote_count =
-                    IntGaugeVec::new(Opts::new("seichi_player_vote_count", ""), &["uuid"])?;
-                let play_ticks =
-                    IntGaugeVec::new(Opts::new("seichi_player_play_ticks", ""), &["uuid"])?;
+                let break_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_break_count",
+                        "Metrics of player's break counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let build_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_build_count",
+                        "Metrics of player's build counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let vote_count = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_vote_count",
+                        "Metrics of player's vote counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
+                let play_ticks = IntGaugeVec::new(
+                    Opts::new(
+                        "seichi_player_play_ticks",
+                        "Metrics of player's play-tick counts partitioned by uuid",
+                    ),
+                    &["uuid"],
+                )?;
 
                 Ok(Collectors {
                     break_count,
@@ -149,7 +168,9 @@ mod infra_axum_handlers {
         }
 
         #[tracing::instrument]
-        pub fn present_player_data(data: &KnownPlayerData) -> anyhow::Result<BoxBody> {
+        pub fn present_player_data_as_prometheus_metrics(
+            data: &KnownPlayerData,
+        ) -> anyhow::Result<String> {
             let collectors = Collectors::new()?;
 
             for record in &data.break_counts {
@@ -180,11 +201,11 @@ mod infra_axum_handlers {
                 metrics.set(record.play_ticks as i64);
             }
 
+            let metrics_family = collectors.collect();
+
             let mut buffer = vec![];
-
-            TextEncoder::new().encode(&collectors.collect(), &mut buffer)?;
-
-            Ok(boxed(String::from_utf8(buffer)?))
+            TextEncoder::new().encode(&metrics_family, &mut buffer)?;
+            Ok(String::from_utf8(buffer)?)
         }
     }
 
@@ -207,9 +228,12 @@ mod infra_axum_handlers {
             match use_case
                 .get_all_known_player_data()
                 .await
-                .and_then(|known_player_data| presenter::present_player_data(&known_player_data))
-            {
-                Ok(response) => (StatusCode::OK, Response::new(response)).into_response(),
+                .and_then(|known_player_data| {
+                    presenter::present_player_data_as_prometheus_metrics(&known_player_data)
+                }) {
+                Ok(metrics_presentation) => {
+                    (StatusCode::OK, Response::new(metrics_presentation)).into_response()
+                }
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     const_error_response().into_response()
