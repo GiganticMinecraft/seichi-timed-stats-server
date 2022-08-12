@@ -63,11 +63,18 @@ mod use_cases {
     impl GetAllPlayerDataUseCase {
         #[tracing::instrument]
         pub async fn get_all_known_player_data(&self) -> anyhow::Result<KnownPlayerData> {
+            let (break_counts, build_counts, play_ticks, vote_counts) = tokio::try_join!(
+                self.repository.get_all_break_counts(),
+                self.repository.get_all_build_counts(),
+                self.repository.get_all_play_ticks(),
+                self.repository.get_all_vote_counts(),
+            )?;
+
             Ok(KnownPlayerData {
-                break_counts: self.repository.get_all_break_counts().await?,
-                build_counts: self.repository.get_all_build_counts().await?,
-                play_ticks: self.repository.get_all_play_ticks().await?,
-                vote_counts: self.repository.get_all_vote_counts().await?,
+                break_counts,
+                build_counts,
+                play_ticks,
+                vote_counts,
             })
         }
     }
