@@ -95,124 +95,101 @@ mod infra_axum_handlers {
     }
 
     mod presenter {
-        use crate::domain::KnownPlayerData;
-        use prometheus::core::{Collector, Desc};
-        use prometheus::proto::MetricFamily;
-        use prometheus::{Encoder, IntGaugeVec, Opts, TextEncoder};
-        use std::collections::HashMap;
+        use crate::domain::{
+            KnownPlayerData, PlayerBreakCount, PlayerBuildCount, PlayerPlayTicks, PlayerVoteCount,
+        };
+        use std::fmt::Write;
 
-        struct Collectors {
-            break_count: IntGaugeVec,
-            build_count: IntGaugeVec,
-            vote_count: IntGaugeVec,
-            play_ticks: IntGaugeVec,
+        fn estimate_presented_string_size(data: &KnownPlayerData) -> usize {
+            // Each record is estimated to have 90 bytes.
+            // The constant term (150 bytes per metrics) arises from
+            //   the metrics type specification and the help string.
+            (150 + data.break_counts.len() * 90)
+                + (150 + data.build_counts.len() * 90)
+                + (150 + data.vote_counts.len() * 90)
+                + (150 + data.play_ticks.len() * 90)
         }
 
-        impl Collectors {
-            fn new() -> anyhow::Result<Self> {
-                let break_count = IntGaugeVec::new(
-                    Opts::new(
-                        "seichi_player_break_count",
-                        "Metrics of player's break counts partitioned by uuid",
-                    ),
-                    &["uuid"],
-                )?;
-                let build_count = IntGaugeVec::new(
-                    Opts::new(
-                        "seichi_player_build_count",
-                        "Metrics of player's build counts partitioned by uuid",
-                    ),
-                    &["uuid"],
-                )?;
-                let vote_count = IntGaugeVec::new(
-                    Opts::new(
-                        "seichi_player_vote_count",
-                        "Metrics of player's vote counts partitioned by uuid",
-                    ),
-                    &["uuid"],
-                )?;
-                let play_ticks = IntGaugeVec::new(
-                    Opts::new(
-                        "seichi_player_play_ticks",
-                        "Metrics of player's play-tick counts partitioned by uuid",
-                    ),
-                    &["uuid"],
-                )?;
-
-                Ok(Collectors {
-                    break_count,
-                    build_count,
-                    vote_count,
-                    play_ticks,
-                })
+        fn write_break_counts(
+            break_counts: &[PlayerBreakCount],
+            target: &mut String,
+        ) -> anyhow::Result<()> {
+            target.write_str("# HELP seichi_player_break_count Metrics of player's break counts partitioned by uuid\n")?;
+            target.write_str("# TYPE seichi_player_break_count gauge\n")?;
+            for count in break_counts {
+                let record = format!(
+                    r#"seichi_player_break_count{{uuid="{}"}} {}{}"#,
+                    count.player.uuid, count.break_count, '\n'
+                );
+                target.write_str(&record)?;
             }
+
+            Ok(())
         }
 
-        impl Collector for Collectors {
-            fn desc(&self) -> Vec<&Desc> {
-                vec![
-                    self.break_count.desc(),
-                    self.build_count.desc(),
-                    self.vote_count.desc(),
-                    self.play_ticks.desc(),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
+        fn write_build_counts(
+            build_counts: &[PlayerBuildCount],
+            target: &mut String,
+        ) -> anyhow::Result<()> {
+            target.write_str("# HELP seichi_player_build_count Metrics of player's build counts partitioned by uuid\n")?;
+            target.write_str("# TYPE seichi_player_build_count gauge\n")?;
+            for count in build_counts {
+                let record = format!(
+                    r#"seichi_player_build_count{{uuid="{}"}} {}{}"#,
+                    count.player.uuid, count.build_count, '\n'
+                );
+                target.write_str(&record)?;
             }
 
-            fn collect(&self) -> Vec<MetricFamily> {
-                vec![
-                    self.break_count.collect(),
-                    self.build_count.collect(),
-                    self.vote_count.collect(),
-                    self.play_ticks.collect(),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
+            Ok(())
+        }
+
+        fn write_vote_counts(
+            vote_counts: &[PlayerVoteCount],
+            target: &mut String,
+        ) -> anyhow::Result<()> {
+            target.write_str("# HELP seichi_player_vote_count Metrics of player's vote counts partitioned by uuid\n")?;
+            target.write_str("# TYPE seichi_player_vote_count gauge\n")?;
+            for count in vote_counts {
+                let record = format!(
+                    r#"seichi_player_vote_count{{uuid="{}"}} {}{}"#,
+                    count.player.uuid, count.vote_count, '\n'
+                );
+                target.write_str(&record)?;
             }
+
+            Ok(())
+        }
+
+        fn write_play_ticks(
+            play_ticks: &[PlayerPlayTicks],
+            target: &mut String,
+        ) -> anyhow::Result<()> {
+            target.write_str("# HELP seichi_player_play_ticks Metrics of player's play-tick counts partitioned by uuid\n")?;
+            target.write_str("# TYPE seichi_player_play_ticks gauge\n")?;
+            for count in play_ticks {
+                let record = format!(
+                    r#"seichi_player_play_ticks{{uuid="{}"}} {}{}"#,
+                    count.player.uuid, count.play_ticks, '\n'
+                );
+                target.write_str(&record)?;
+            }
+
+            Ok(())
         }
 
         #[tracing::instrument]
         pub fn present_player_data_as_prometheus_metrics(
             data: &KnownPlayerData,
         ) -> anyhow::Result<String> {
-            let collectors = Collectors::new()?;
+            let mut result = String::with_capacity(estimate_presented_string_size(data));
 
-            for record in &data.break_counts {
-                let uuid = record.player.uuid.as_str();
-                let metrics = collectors
-                    .break_count
-                    .with(&HashMap::from([("uuid", uuid)]));
-                metrics.set(record.break_count as i64);
-            }
+            write_break_counts(&data.break_counts, &mut result)?;
+            write_build_counts(&data.build_counts, &mut result)?;
+            write_vote_counts(&data.vote_counts, &mut result)?;
+            write_play_ticks(&data.play_ticks, &mut result)?;
 
-            for record in &data.build_counts {
-                let uuid = record.player.uuid.as_str();
-                let metrics = collectors
-                    .build_count
-                    .with(&HashMap::from([("uuid", uuid)]));
-                metrics.set(record.build_count as i64);
-            }
-
-            for record in &data.vote_counts {
-                let uuid = record.player.uuid.as_str();
-                let metrics = collectors.vote_count.with(&HashMap::from([("uuid", uuid)]));
-                metrics.set(record.vote_count as i64);
-            }
-
-            for record in &data.play_ticks {
-                let uuid = record.player.uuid.as_str();
-                let metrics = collectors.play_ticks.with(&HashMap::from([("uuid", uuid)]));
-                metrics.set(record.play_ticks as i64);
-            }
-
-            let metrics_family = collectors.collect();
-
-            let mut buffer = vec![];
-            TextEncoder::new().encode(&metrics_family, &mut buffer)?;
-            Ok(String::from_utf8(buffer)?)
+            Ok(result)
         }
     }
 

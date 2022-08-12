@@ -15,5 +15,4 @@ tracing = "0.1.36"
 anyhow = "1.0.60"
 envy = "0.4.2"
 serde = "1.0.143"
-prometheus = "0.13.1"
 tower-http = { version = "0.3.4", features = ["trace"] }
