@@ -60,7 +60,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
-      group: "docker-build-reader"
+      group: ${{ github.ref }}-docker-build-reader
       cancel-in-progress: true
     steps:
       - name: checkout
@@ -150,7 +150,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
-      group: "docker-build-translator"
+      group: ${{ github.ref }}-docker-build-translator
       cancel-in-progress: true
     steps:
       - name: checkout
