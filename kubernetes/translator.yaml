@@ -48,8 +48,24 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: seichi-timed-stats-translator-config
+  name: seichi-timed-stats-translator
 data:
   # Override this
   GAME_DATA_SERVER_GRPC_ENDPOINT_URL: "https://example.com"
   RUST_LOG: "info"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seichi-timed-stats-translator
+spec:
+  type: ClusterIP
+  ports:
+    - name: seichi-timed-stats-translator-web
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: seichi-timed-stats-server
+    component: translator
