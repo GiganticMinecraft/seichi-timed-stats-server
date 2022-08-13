@@ -3,11 +3,37 @@
 #![allow(clippy::cargo_common_metadata)]
 
 mod domain {
+    use anyhow::anyhow;
+    use prost::bytes::Buf;
     use std::fmt::Debug;
+    use std::str::Utf8Error;
+
+    #[derive(Debug, Clone)]
+    pub struct UuidString([u8; 36]);
+
+    impl UuidString {
+        pub fn as_str(&self) -> Result<&str, Utf8Error> {
+            std::str::from_utf8(&self.0)
+        }
+
+        pub fn from_string(str: &String) -> anyhow::Result<UuidString> {
+            if !str.is_ascii() {
+                Err(anyhow!("Expected ascii string for UuidString, got {str}"))
+            } else if str.len() != 36 {
+                Err(anyhow!(
+                    "Expect string of length 36 for UuidString, got {str}"
+                ))
+            } else {
+                let mut result: [u8; 36] = [0; 36];
+                str.as_bytes().copy_to_slice(result.as_mut_slice());
+                Ok(UuidString(result))
+            }
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub struct Player {
-        pub uuid: String,
+        pub uuid: UuidString,
     }
 
     #[derive(Debug, Clone)]
@@ -119,7 +145,9 @@ mod infra_axum_handlers {
             for count in break_counts {
                 let record = format!(
                     r#"seichi_player_break_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid, count.break_count, '\n'
+                    count.player.uuid.as_str()?,
+                    count.break_count,
+                    '\n'
                 );
                 target.write_str(&record)?;
             }
@@ -136,7 +164,9 @@ mod infra_axum_handlers {
             for count in build_counts {
                 let record = format!(
                     r#"seichi_player_build_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid, count.build_count, '\n'
+                    count.player.uuid.as_str()?,
+                    count.build_count,
+                    '\n'
                 );
                 target.write_str(&record)?;
             }
@@ -153,7 +183,9 @@ mod infra_axum_handlers {
             for count in vote_counts {
                 let record = format!(
                     r#"seichi_player_vote_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid, count.vote_count, '\n'
+                    count.player.uuid.as_str()?,
+                    count.vote_count,
+                    '\n'
                 );
                 target.write_str(&record)?;
             }
@@ -170,7 +202,9 @@ mod infra_axum_handlers {
             for count in play_ticks {
                 let record = format!(
                     r#"seichi_player_play_ticks{{uuid="{}"}} {}{}"#,
-                    count.player.uuid, count.play_ticks, '\n'
+                    count.player.uuid.as_str()?,
+                    count.play_ticks,
+                    '\n'
                 );
                 target.write_str(&record)?;
             }
@@ -252,9 +286,12 @@ mod infra_repository_impls {
     mod buf_generated_to_domain {
         use super::buf_generated::gigantic_minecraft::seichi_game_data::v1 as generated;
         use crate::domain;
+        use crate::domain::UuidString;
 
-        fn into_domain_player(p: generated::Player) -> domain::Player {
-            domain::Player { uuid: p.uuid }
+        fn into_domain_player(p: generated::Player) -> anyhow::Result<domain::Player> {
+            Ok(domain::Player {
+                uuid: UuidString::from_string(&p.uuid)?,
+            })
         }
 
         #[tracing::instrument]
@@ -263,7 +300,7 @@ mod infra_repository_impls {
         ) -> anyhow::Result<domain::Player> {
             let player = player.ok_or_else(|| anyhow::anyhow!("Player field not set"))?;
 
-            Ok(into_domain_player(player))
+            Ok(into_domain_player(player)?)
         }
 
         #[tracing::instrument]
