@@ -52,3 +52,7 @@ data:
   CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
   # Override this. The database name in influxdb
   CONFIG_INFLUXDB_DATABASE_NAME: "seichi-timed-stats"
+  # Override this. The username telegraf uses to access influxdb
+  CONFIG_INFLUXDB_USERNAME: "admin"
+  # Override this. The password telegraf uses to access influxdb
+  CONFIG_INFLUXDB_PASSWORD: "password"
