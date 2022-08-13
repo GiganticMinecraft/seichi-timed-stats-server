@@ -41,5 +41,3 @@ data:
   CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
   # Override this. The database name in influxdb
   CONFIG_DATABASE_NAME: "seichi-timed-stats"
-
-  CONFIG_TRANSLATOR_SERVICE_URL: "seichi-timed-stats-translator:80"
