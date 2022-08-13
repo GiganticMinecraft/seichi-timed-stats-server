@@ -31,7 +31,7 @@ spec:
               memory: 2048Mi
           envFrom:
             - configMapRef:
-                name: seichi-timed-stats-translator-config
+                name: seichi-timed-stats-translator
           image: ghcr.io/giganticminecraft/seichi-timed-stats-translator:sha-41a2d43
           name: seichi-timed-stats-translator
           ports:
