@@ -30,3 +30,16 @@ spec:
               memory: 512Mi
           image: telegraf:1.23.3-alpine
           name: seichi-timed-stats-telegraf
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seichi-timed-stats-translator
+data:
+  # Override this. The full url of the influxdb
+  CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
+  # Override this. The database name in influxdb
+  CONFIG_DATABASE_NAME: "seichi-timed-stats"
+
+  CONFIG_TRANSLATOR_SERVICE_URL: "seichi-timed-stats-translator:80"
