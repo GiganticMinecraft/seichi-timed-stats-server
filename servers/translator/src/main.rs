@@ -5,18 +5,19 @@
 mod domain {
     use anyhow::anyhow;
     use prost::bytes::Buf;
+    use std::collections::HashMap;
     use std::fmt::Debug;
     use std::str::Utf8Error;
 
-    #[derive(Debug, Clone)]
-    pub struct UuidString([u8; 36]);
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub struct PlayerUuidString([u8; 36]);
 
-    impl UuidString {
+    impl PlayerUuidString {
         pub fn as_str(&self) -> Result<&str, Utf8Error> {
             std::str::from_utf8(&self.0)
         }
 
-        pub fn from_string(str: &String) -> anyhow::Result<UuidString> {
+        pub fn from_string(str: &String) -> anyhow::Result<PlayerUuidString> {
             if !str.is_ascii() {
                 Err(anyhow!("Expected ascii string for UuidString, got {str}"))
             } else if str.len() != 36 {
@@ -26,14 +27,14 @@ mod domain {
             } else {
                 let mut result: [u8; 36] = [0; 36];
                 str.as_bytes().copy_to_slice(result.as_mut_slice());
-                Ok(UuidString(result))
+                Ok(PlayerUuidString(result))
             }
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Player {
-        pub uuid: UuidString,
+        pub uuid: PlayerUuidString,
     }
 
     #[derive(Debug, Clone)]
@@ -61,12 +62,15 @@ mod domain {
     }
 
     #[derive(Debug, Clone, Default)]
-    pub struct KnownPlayerData {
-        pub break_counts: Vec<PlayerBreakCount>,
-        pub build_counts: Vec<PlayerBuildCount>,
-        pub play_ticks: Vec<PlayerPlayTicks>,
-        pub vote_counts: Vec<PlayerVoteCount>,
+    pub struct AggregatedPlayerData {
+        pub break_count: u64,
+        pub build_count: u64,
+        pub play_ticks: u64,
+        pub vote_count: u64,
     }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct KnownAggregatedPlayerData(pub HashMap<Player, AggregatedPlayerData>);
 
     #[async_trait::async_trait]
     pub trait PlayerDataRepository: Debug + Sync + Send + 'static {
@@ -78,7 +82,8 @@ mod domain {
 }
 
 mod use_cases {
-    use crate::domain::{KnownPlayerData, PlayerDataRepository};
+    use crate::domain::{AggregatedPlayerData, KnownAggregatedPlayerData, PlayerDataRepository};
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     #[derive(Debug, Clone)]
@@ -88,7 +93,9 @@ mod use_cases {
 
     impl GetAllPlayerDataUseCase {
         #[tracing::instrument]
-        pub async fn get_all_known_player_data(&self) -> anyhow::Result<KnownPlayerData> {
+        pub async fn get_all_known_aggregated_player_data(
+            &self,
+        ) -> anyhow::Result<KnownAggregatedPlayerData> {
             let (break_counts, build_counts, play_ticks, vote_counts) = tokio::try_join!(
                 self.repository.get_all_break_counts(),
                 self.repository.get_all_build_counts(),
@@ -96,12 +103,30 @@ mod use_cases {
                 self.repository.get_all_vote_counts(),
             )?;
 
-            Ok(KnownPlayerData {
-                break_counts,
-                build_counts,
-                play_ticks,
-                vote_counts,
-            })
+            let mut result_map: HashMap<_, AggregatedPlayerData> =
+                HashMap::with_capacity(break_counts.len());
+
+            for break_count in break_counts {
+                let mut entry = result_map.entry(break_count.player).or_default();
+                entry.break_count = break_count.break_count;
+            }
+
+            for build_count in build_counts {
+                let mut entry = result_map.entry(build_count.player).or_default();
+                entry.build_count = build_count.build_count;
+            }
+
+            for tick_count in play_ticks {
+                let mut entry = result_map.entry(tick_count.player).or_default();
+                entry.play_ticks = tick_count.play_ticks;
+            }
+
+            for vote_count in vote_counts {
+                let mut entry = result_map.entry(vote_count.player).or_default();
+                entry.vote_count = vote_count.vote_count;
+            }
+
+            Ok(KnownAggregatedPlayerData(result_map))
         }
     }
 }
@@ -121,107 +146,46 @@ mod infra_axum_handlers {
     }
 
     mod presenter {
-        use crate::domain::{
-            KnownPlayerData, PlayerBreakCount, PlayerBuildCount, PlayerPlayTicks, PlayerVoteCount,
-        };
+        use crate::domain::{KnownAggregatedPlayerData, Player};
         use std::fmt::Write;
 
-        fn estimate_presented_string_size(data: &KnownPlayerData) -> usize {
-            // Each record is estimated to have 90 bytes.
-            // The constant term (150 bytes per metrics) arises from
-            //   the metrics type specification and the help string.
-            (150 + data.break_counts.len() * 90)
-                + (150 + data.build_counts.len() * 90)
-                + (150 + data.vote_counts.len() * 90)
-                + (150 + data.play_ticks.len() * 90)
+        fn estimate_presented_string_size(data: &KnownAggregatedPlayerData) -> usize {
+            // Each Prometheus record takes about 85 characters and 4 records are generated per
+            // aggregated player data, hence length * 340. The constant term is from the help string.
+            100 + data.0.len() * 340
         }
 
-        fn write_break_counts(
-            break_counts: &[PlayerBreakCount],
+        fn write_record(
             target: &mut String,
+            player: &Player,
+            kind: &'static str,
+            value: u64,
         ) -> anyhow::Result<()> {
-            target.write_str("# HELP seichi_player_break_count Metrics of player's break counts partitioned by uuid\n")?;
-            target.write_str("# TYPE seichi_player_break_count gauge\n")?;
-            for count in break_counts {
-                let record = format!(
-                    r#"seichi_player_break_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid.as_str()?,
-                    count.break_count,
-                    '\n'
-                );
-                target.write_str(&record)?;
-            }
-
-            Ok(())
-        }
-
-        fn write_build_counts(
-            build_counts: &[PlayerBuildCount],
-            target: &mut String,
-        ) -> anyhow::Result<()> {
-            target.write_str("# HELP seichi_player_build_count Metrics of player's build counts partitioned by uuid\n")?;
-            target.write_str("# TYPE seichi_player_build_count gauge\n")?;
-            for count in build_counts {
-                let record = format!(
-                    r#"seichi_player_build_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid.as_str()?,
-                    count.build_count,
-                    '\n'
-                );
-                target.write_str(&record)?;
-            }
-
-            Ok(())
-        }
-
-        fn write_vote_counts(
-            vote_counts: &[PlayerVoteCount],
-            target: &mut String,
-        ) -> anyhow::Result<()> {
-            target.write_str("# HELP seichi_player_vote_count Metrics of player's vote counts partitioned by uuid\n")?;
-            target.write_str("# TYPE seichi_player_vote_count gauge\n")?;
-            for count in vote_counts {
-                let record = format!(
-                    r#"seichi_player_vote_count{{uuid="{}"}} {}{}"#,
-                    count.player.uuid.as_str()?,
-                    count.vote_count,
-                    '\n'
-                );
-                target.write_str(&record)?;
-            }
-
-            Ok(())
-        }
-
-        fn write_play_ticks(
-            play_ticks: &[PlayerPlayTicks],
-            target: &mut String,
-        ) -> anyhow::Result<()> {
-            target.write_str("# HELP seichi_player_play_ticks Metrics of player's play-tick counts partitioned by uuid\n")?;
-            target.write_str("# TYPE seichi_player_play_ticks gauge\n")?;
-            for count in play_ticks {
-                let record = format!(
-                    r#"seichi_player_play_ticks{{uuid="{}"}} {}{}"#,
-                    count.player.uuid.as_str()?,
-                    count.play_ticks,
-                    '\n'
-                );
-                target.write_str(&record)?;
-            }
-
-            Ok(())
+            Ok(target.write_str(&format!(
+                r#"player_data{{uuid="{}",kind="{}"}} {}{}"#,
+                player.uuid.as_str()?,
+                kind,
+                value,
+                '\n'
+            ))?)
         }
 
         #[tracing::instrument]
         pub fn present_player_data_as_prometheus_metrics(
-            data: &KnownPlayerData,
+            data: &KnownAggregatedPlayerData,
         ) -> anyhow::Result<String> {
             let mut result = String::with_capacity(estimate_presented_string_size(data));
 
-            write_break_counts(&data.break_counts, &mut result)?;
-            write_build_counts(&data.build_counts, &mut result)?;
-            write_vote_counts(&data.vote_counts, &mut result)?;
-            write_play_ticks(&data.play_ticks, &mut result)?;
+            result
+                .write_str("# HELP player_data Player metrics, partitioned by uuid and kind\n")?;
+            result.write_str("# TYPE player_data gauge\n")?;
+
+            for (player, data) in &data.0 {
+                write_record(&mut result, player, "break_count", data.break_count)?;
+                write_record(&mut result, player, "build_count", data.build_count)?;
+                write_record(&mut result, player, "play_ticks", data.play_ticks)?;
+                write_record(&mut result, player, "vote_count", data.vote_count)?;
+            }
 
             Ok(result)
         }
@@ -244,10 +208,12 @@ mod infra_axum_handlers {
             };
 
             match use_case
-                .get_all_known_player_data()
+                .get_all_known_aggregated_player_data()
                 .await
-                .and_then(|known_player_data| {
-                    presenter::present_player_data_as_prometheus_metrics(&known_player_data)
+                .and_then(|known_aggregated_player_data| {
+                    presenter::present_player_data_as_prometheus_metrics(
+                        &known_aggregated_player_data,
+                    )
                 }) {
                 Ok(metrics_presentation) => {
                     (StatusCode::OK, Response::new(metrics_presentation)).into_response()
@@ -286,11 +252,11 @@ mod infra_repository_impls {
     mod buf_generated_to_domain {
         use super::buf_generated::gigantic_minecraft::seichi_game_data::v1 as generated;
         use crate::domain;
-        use crate::domain::UuidString;
+        use crate::domain::PlayerUuidString;
 
         fn into_domain_player(p: generated::Player) -> anyhow::Result<domain::Player> {
             Ok(domain::Player {
-                uuid: UuidString::from_string(&p.uuid)?,
+                uuid: PlayerUuidString::from_string(&p.uuid)?,
             })
         }
 
