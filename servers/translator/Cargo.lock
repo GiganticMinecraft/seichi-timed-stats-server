@@ -786,6 +786,7 @@ dependencies = [
  "async-trait",
  "axum",
  "envy",
+ "indexmap",
  "pbjson-types",
  "prost",
  "serde",

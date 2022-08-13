@@ -4,8 +4,8 @@
 
 mod domain {
     use anyhow::anyhow;
+    use indexmap::IndexMap;
     use prost::bytes::Buf;
-    use std::collections::HashMap;
     use std::fmt::Debug;
     use std::str::Utf8Error;
 
@@ -70,7 +70,7 @@ mod domain {
     }
 
     #[derive(Debug, Clone, Default)]
-    pub struct KnownAggregatedPlayerData(pub HashMap<Player, AggregatedPlayerData>);
+    pub struct KnownAggregatedPlayerData(pub IndexMap<Player, AggregatedPlayerData>);
 
     #[async_trait::async_trait]
     pub trait PlayerDataRepository: Debug + Sync + Send + 'static {
@@ -83,7 +83,7 @@ mod domain {
 
 mod use_cases {
     use crate::domain::{AggregatedPlayerData, KnownAggregatedPlayerData, PlayerDataRepository};
-    use std::collections::HashMap;
+    use indexmap::IndexMap;
     use std::sync::Arc;
 
     #[derive(Debug, Clone)]
@@ -103,8 +103,8 @@ mod use_cases {
                 self.repository.get_all_vote_counts(),
             )?;
 
-            let mut result_map: HashMap<_, AggregatedPlayerData> =
-                HashMap::with_capacity(break_counts.len());
+            let mut result_map: IndexMap<_, AggregatedPlayerData> =
+                IndexMap::with_capacity(break_counts.len());
 
             for break_count in break_counts {
                 let mut entry = result_map.entry(break_count.player).or_default();
