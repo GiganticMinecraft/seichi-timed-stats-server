@@ -28,16 +28,27 @@ spec:
               memory: 512Mi
             limits:
               memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: seichi-timed-stats-telegraf-influxdb-config
           image: telegraf:1.23.3-alpine
           name: seichi-timed-stats-telegraf
+          volumeMounts:
+            - name: telegraf-conf
+              mountPath: /etc/telegraf/telegraf.conf
+              subPath: telegraf.conf
+      volumes:
+        - name: telegraf-conf
+          configMap:
+            name: seichi-timed-stats-telegraf-config
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: seichi-timed-stats-translator
+  name: seichi-timed-stats-telegraf-influxdb-config
 data:
   # Override this. The full url of the influxdb
   CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
   # Override this. The database name in influxdb
-  CONFIG_DATABASE_NAME: "seichi-timed-stats"
+  CONFIG_INFLUXDB_DATABASE_NAME: "seichi-timed-stats"
