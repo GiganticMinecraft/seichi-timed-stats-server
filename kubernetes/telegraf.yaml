@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  labels:
+    app: seichi-timed-stats-server
+    component: telegraf
+  name: seichi-timed-stats-telegraf
+  annotations:
+    reloader.stakater.com/auto: "true"
+
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: seichi-timed-stats-server
+      component: telegraf
+  template:
+    metadata:
+      labels:
+        app: seichi-timed-stats-server
+        component: telegraf
+    spec:
+      containers:
+        - resources:
+            requests:
+              memory: 512Mi
+            limits:
+              memory: 512Mi
+          image: telegraf:1.23.3-alpine
+          name: seichi-timed-stats-telegraf
