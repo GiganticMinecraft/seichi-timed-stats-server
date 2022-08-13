@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  labels:
+    app: seichi-timed-stats-server
+    component: telegraf
+  name: seichi-timed-stats-telegraf
+  annotations:
+    reloader.stakater.com/auto: "true"
+
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: seichi-timed-stats-server
+      component: telegraf
+  template:
+    metadata:
+      labels:
+        app: seichi-timed-stats-server
+        component: telegraf
+    spec:
+      containers:
+        - resources:
+            requests:
+              memory: 512Mi
+            limits:
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: seichi-timed-stats-telegraf-influxdb-config
+          image: telegraf:1.23.3-alpine
+          name: seichi-timed-stats-telegraf
+          volumeMounts:
+            - name: telegraf-conf
+              mountPath: /etc/telegraf/telegraf.conf
+              subPath: telegraf.conf
+      volumes:
+        - name: telegraf-conf
+          configMap:
+            name: seichi-timed-stats-telegraf-config
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seichi-timed-stats-telegraf-influxdb-config
+data:
+  # Override this. The full url of the influxdb
+  CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
+  # Override this. The database name in influxdb
+  CONFIG_INFLUXDB_DATABASE_NAME: "seichi-timed-stats"
