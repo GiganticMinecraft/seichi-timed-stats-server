@@ -50,9 +50,9 @@ metadata:
 data:
   # Override this. The full url of the influxdb
   CONFIG_INFLUXDB_URL: "http://127.0.0.1:8086"
-  # Override this. The database name in influxdb
-  CONFIG_INFLUXDB_DATABASE_NAME: "seichi-timed-stats"
-  # Override this. The username telegraf uses to access influxdb
-  CONFIG_INFLUXDB_USERNAME: "admin"
-  # Override this. The password telegraf uses to access influxdb
-  CONFIG_INFLUXDB_PASSWORD: "password"
+  # Override this. Token for authentication
+  CONFIG_INFLUXDB_TOKEN: "TOKEN"
+  # Override this. Organization is the name of the organization you wish to write to.
+  CONFIG_INFLUXDB_ORGANIZATION: "ORGANIZATION"
+  # Override this. Destination bucket to write into.
+  CONFIG_INFLUXDB_BUCKET: "seichi-timed-stats"
