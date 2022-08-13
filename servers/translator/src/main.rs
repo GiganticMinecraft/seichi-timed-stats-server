@@ -17,7 +17,7 @@ mod domain {
             std::str::from_utf8(&self.0)
         }
 
-        pub fn from_string(str: &String) -> anyhow::Result<PlayerUuidString> {
+        pub fn from_string(str: &String) -> anyhow::Result<Self> {
             if !str.is_ascii() {
                 Err(anyhow!("Expected ascii string for UuidString, got {str}"))
             } else if str.len() != 36 {
@@ -27,7 +27,7 @@ mod domain {
             } else {
                 let mut result: [u8; 36] = [0; 36];
                 str.as_bytes().copy_to_slice(result.as_mut_slice());
-                Ok(PlayerUuidString(result))
+                Ok(Self(result))
             }
         }
     }
@@ -243,8 +243,8 @@ mod infra_repository_impls {
         }
 
         impl GrpcClientConfig {
-            pub fn from_env() -> anyhow::Result<GrpcClientConfig> {
-                Ok(envy::from_env::<GrpcClientConfig>()?)
+            pub fn from_env() -> anyhow::Result<Self> {
+                Ok(envy::from_env::<Self>()?)
             }
         }
     }
@@ -254,7 +254,7 @@ mod infra_repository_impls {
         use crate::domain;
         use crate::domain::PlayerUuidString;
 
-        fn into_domain_player(p: generated::Player) -> anyhow::Result<domain::Player> {
+        fn into_domain_player(p: &generated::Player) -> anyhow::Result<domain::Player> {
             Ok(domain::Player {
                 uuid: PlayerUuidString::from_string(&p.uuid)?,
             })
@@ -266,7 +266,7 @@ mod infra_repository_impls {
         ) -> anyhow::Result<domain::Player> {
             let player = player.ok_or_else(|| anyhow::anyhow!("Player field not set"))?;
 
-            Ok(into_domain_player(player)?)
+            into_domain_player(&player)
         }
 
         #[tracing::instrument]
@@ -322,11 +322,11 @@ mod infra_repository_impls {
         #[tracing::instrument]
         pub async fn initialize_connections_with(
             config: config::GrpcClientConfig,
-        ) -> anyhow::Result<GameDataGrpcRepository> {
+        ) -> anyhow::Result<Self> {
             let client =
                 GameDataGrpcClient::connect(config.game_data_server_grpc_endpoint_url).await?;
 
-            Ok(GameDataGrpcRepository { client })
+            Ok(Self { client })
         }
 
         pub(crate) fn game_data_client(&self) -> GameDataGrpcClient {
