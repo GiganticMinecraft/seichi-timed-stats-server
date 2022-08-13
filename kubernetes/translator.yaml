@@ -25,10 +25,10 @@ spec:
       containers:
         - resources:
             requests:
-              memory: 64Mi
+              # This component allocates about 200Mi when queried by a single client to look at 45k-players datasource
+              memory: 350Mi
             limits:
-              # We need to prepare for some memory spikes when fetching all data
-              memory: 2048Mi
+              memory: 512Mi
           envFrom:
             - configMapRef:
                 name: seichi-timed-stats-translator
