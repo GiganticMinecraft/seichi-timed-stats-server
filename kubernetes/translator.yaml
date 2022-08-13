@@ -32,7 +32,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: seichi-timed-stats-translator
-          image: ghcr.io/giganticminecraft/seichi-timed-stats-translator:sha-600a8bd
+          image: ghcr.io/giganticminecraft/seichi-timed-stats-translator:sha-08536a2
           name: seichi-timed-stats-translator
           ports:
             - containerPort: 80
