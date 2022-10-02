@@ -233,6 +233,7 @@ mod infra_repository_impls {
     #[allow(dead_code)]
     #[allow(clippy::nursery, clippy::pedantic)]
     mod buf_generated {
+        #![allow(clippy::derive_partial_eq_without_eq)]
         include!("gen/mod.rs");
     }
 
