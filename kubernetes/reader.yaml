@@ -32,7 +32,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: seichi-timed-stats-reader-config
-          image: ghcr.io/giganticminecraft/seichi-timed-stats-reader:sha-2e22fcc
+          image: ghcr.io/giganticminecraft/seichi-timed-stats-reader:sha-79c728e
           name: seichi-timed-stats-reader
           ports:
             - containerPort: 80
