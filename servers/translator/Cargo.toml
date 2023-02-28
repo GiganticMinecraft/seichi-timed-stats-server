@@ -15,5 +15,5 @@ tracing = "0.1.37"
 anyhow = "1.0.69"
 envy = "0.4.2"
 serde = "1.0.152"
-tower-http = { version = "0.3.5", features = ["trace"] }
+tower-http = { version = "0.4.0", features = ["trace"] }
 indexmap = "1.9.2"
