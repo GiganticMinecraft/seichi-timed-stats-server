@@ -11,7 +11,7 @@ prost = "0.11.8"
 tokio = { version = "1.27.0", features = ["macros", "rt-multi-thread"] }
 tonic = { version = "0.9.1", features = ["gzip"] }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
-tracing = "0.1.38"
+tracing = "0.1.39"
 anyhow = "1.0.69"
 envy = "0.4.2"
 serde = "1.0.189"
