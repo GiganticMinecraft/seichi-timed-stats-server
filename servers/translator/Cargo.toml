@@ -16,4 +16,4 @@ anyhow = "1.0.69"
 envy = "0.4.2"
 serde = "1.0.197"
 tower-http = { version = "0.4.4", features = ["trace"] }
-indexmap = "1.9.2"
+indexmap = "1.9.3"
