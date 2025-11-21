@@ -56,7 +56,7 @@ jobs:
   reader_build_image:
     name: Build reader docker image (and publish on master)
     needs: [ reader-lint-and-test ]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
@@ -146,7 +146,7 @@ jobs:
   translator_build_image:
     name: Build translator docker image (and publish on master)
     needs: [ translator-lint-and-test ]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
     concurrency:
@@ -192,7 +192,7 @@ jobs:
   update-kubernetes-image-tags:
     name: Updates Kubernetes image tags
     needs: [ reader_build_image, translator_build_image ]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     concurrency:
       group: "update-kubernetes-image-tags"
     if: ${{ github.ref == 'refs/heads/master' }}
