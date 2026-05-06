@@ -21,6 +21,7 @@ jobs:
         with:
           toolchain: "1.95.0"
           default: true
+          components: rustfmt, clippy
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
@@ -128,6 +129,7 @@ jobs:
         with:
           toolchain: "1.95.0"
           default: true
+          components: rustfmt, clippy
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
