@@ -33,6 +33,24 @@ jobs:
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
 
+      - name: Install protoc-gen-prost
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-prost --version 0.1.3 --locked
+
+      - name: Install protoc-gen-tonic
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-tonic --version 0.1.0 --locked
+
+      - name: Install protoc-gen-prost-crate
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-prost-crate --version 0.1.5 --locked
+
       # GitHubのUIにエラー/警告を表示してくれるので actions-rs/cargo を利用している
 
       - name: Cargo fmt
@@ -122,6 +140,24 @@ jobs:
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
+
+      - name: Install protoc-gen-prost
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-prost --version 0.1.3 --locked
+
+      - name: Install protoc-gen-tonic
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-tonic --version 0.2.1 --locked
+
+      - name: Install protoc-gen-prost-crate
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: protoc-gen-prost-crate --version 0.1.5 --locked
 
       # GitHubのUIにエラー/警告を表示してくれるので actions-rs/cargo を利用している
 
