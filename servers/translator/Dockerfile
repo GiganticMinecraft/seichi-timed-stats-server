@@ -19,6 +19,11 @@ COPY --from=protoc --link /usr/local/bin/protoc /usr/local/bin/
 ARG PROTOC_NO_VENDOR=true
 ARG PROTOC=/usr/local/bin/protoc
 
+# Install protoc plugins
+RUN cargo install protoc-gen-prost --version 0.1.3 --locked
+RUN cargo install protoc-gen-tonic --version 0.2.1 --locked
+RUN cargo install protoc-gen-prost-crate --version 0.1.5 --locked
+
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
 
