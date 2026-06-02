@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.5.17"
+axum = "0.8.0"
 async-trait = "0.1.80"
 pbjson-types = "0.5.1"
 prost = "0.11.8"
