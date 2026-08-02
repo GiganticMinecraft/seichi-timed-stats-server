@@ -1,6 +1,8 @@
 #![deny(clippy::all, clippy::cargo)]
 #![warn(clippy::nursery, clippy::pedantic)]
 #![allow(clippy::cargo_common_metadata)]
+// 依存クレート同士が同一クレートの別バージョンに依存しているため、このクレートからは解消できない
+#![allow(clippy::multiple_crate_versions)]
 
 mod domain {
     use anyhow::anyhow;
@@ -231,9 +233,12 @@ mod infra_axum_handlers {
 
 mod infra_repository_impls {
     #[allow(dead_code)]
-    #[allow(clippy::nursery, clippy::pedantic)]
+    #[allow(
+        clippy::nursery,
+        clippy::pedantic,
+        clippy::derive_partial_eq_without_eq
+    )]
     mod buf_generated {
-        #![allow(clippy::derive_partial_eq_without_eq)]
         include!("gen/mod.rs");
     }
 
