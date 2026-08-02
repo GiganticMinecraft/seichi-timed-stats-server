@@ -22,8 +22,11 @@ jobs:
         with:
           # TODO: read from rust-toolchain.toml
           toolchain: "1.97.1"
+          components: rustfmt, clippy
           # キャッシュは後続の Swatinem/rust-cache で行う
           cache: false
+          # デフォルトだと RUSTFLAGS=-D warnings が注入され warning がすべてエラー化してしまう
+          rustflags: ""
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
@@ -111,8 +114,11 @@ jobs:
         with:
           # TODO: read from rust-toolchain.toml
           toolchain: "1.97.1"
+          components: rustfmt, clippy
           # キャッシュは後続の Swatinem/rust-cache で行う
           cache: false
+          # デフォルトだと RUSTFLAGS=-D warnings が注入され warning がすべてエラー化してしまう
+          rustflags: ""
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
