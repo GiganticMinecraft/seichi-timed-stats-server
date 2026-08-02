@@ -16,19 +16,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # cargo のエラー/警告の GitHub UI 表示はこの action が登録する problem matcher が行う
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           # TODO: read from rust-toolchain.toml
           toolchain: "1.97.1"
-          profile: "default"
+          # キャッシュは後続の Swatinem/rust-cache で行う
+          cache: false
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
       # https://github.com/Swatinem/rust-cache/tree/cb2cf0cc7c5198d3364b9630e2c3d457f160790c#example-usage
       - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: servers/reader
+          workspaces: servers/reader
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
@@ -41,25 +43,14 @@ jobs:
       - name: Install protoc plugins for buf generate
         run: cargo install protoc-gen-prost@0.2.3 protoc-gen-tonic@0.3.0 protoc-gen-prost-crate@0.3.1
 
-      # GitHubのUIにエラー/警告を表示してくれるので actions-rs/cargo を利用している
-
       - name: Cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --manifest-path servers/reader/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path servers/reader/Cargo.toml --all -- --check
 
       - name: Cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --manifest-path servers/reader/Cargo.toml
+        run: cargo clippy --manifest-path servers/reader/Cargo.toml
 
       - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path servers/reader/Cargo.toml --all-features
+        run: cargo test --manifest-path servers/reader/Cargo.toml --all-features
 
   reader_build_image:
     name: Build reader docker image (and publish on master)
@@ -114,19 +105,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # cargo のエラー/警告の GitHub UI 表示はこの action が登録する problem matcher が行う
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           # TODO: read from rust-toolchain.toml
           toolchain: "1.97.1"
-          profile: "default"
+          # キャッシュは後続の Swatinem/rust-cache で行う
+          cache: false
 
       # > selecting a toolchain either by action or manual `rustup` calls should happen
       # > before the plugin, as it uses the current rustc version as its cache key
       # https://github.com/Swatinem/rust-cache/tree/cb2cf0cc7c5198d3364b9630e2c3d457f160790c#example-usage
       - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: servers/translator
+          workspaces: servers/translator
 
       # buf CLIがビルドに必要
       - uses: bufbuild/buf-setup-action@v1
@@ -139,25 +132,14 @@ jobs:
       - name: Install protoc plugins for buf generate
         run: cargo install protoc-gen-prost@0.2.3 protoc-gen-tonic@0.3.0 protoc-gen-prost-crate@0.3.1
 
-      # GitHubのUIにエラー/警告を表示してくれるので actions-rs/cargo を利用している
-
       - name: Cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --manifest-path servers/translator/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path servers/translator/Cargo.toml --all -- --check
 
       - name: Cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --manifest-path servers/translator/Cargo.toml
+        run: cargo clippy --manifest-path servers/translator/Cargo.toml
 
       - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path servers/translator/Cargo.toml --all-features
+        run: cargo test --manifest-path servers/translator/Cargo.toml --all-features
 
   translator_build_image:
     name: Build translator docker image (and publish on master)
