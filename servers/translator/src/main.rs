@@ -15,7 +15,7 @@ mod domain {
     pub struct PlayerUuidString([u8; 36]);
 
     impl PlayerUuidString {
-        pub fn as_str(&self) -> Result<&str, Utf8Error> {
+        pub const fn as_str(&self) -> Result<&str, Utf8Error> {
             std::str::from_utf8(&self.0)
         }
 
@@ -109,22 +109,22 @@ mod use_cases {
                 IndexMap::with_capacity(break_counts.len());
 
             for break_count in break_counts {
-                let mut entry = result_map.entry(break_count.player).or_default();
+                let entry = result_map.entry(break_count.player).or_default();
                 entry.break_count = break_count.break_count;
             }
 
             for build_count in build_counts {
-                let mut entry = result_map.entry(build_count.player).or_default();
+                let entry = result_map.entry(build_count.player).or_default();
                 entry.build_count = build_count.build_count;
             }
 
             for tick_count in play_ticks {
-                let mut entry = result_map.entry(tick_count.player).or_default();
+                let entry = result_map.entry(tick_count.player).or_default();
                 entry.play_ticks = tick_count.play_ticks;
             }
 
             for vote_count in vote_counts {
-                let mut entry = result_map.entry(vote_count.player).or_default();
+                let entry = result_map.entry(vote_count.player).or_default();
                 entry.vote_count = vote_count.vote_count;
             }
 
@@ -136,8 +136,7 @@ mod use_cases {
 mod infra_axum_handlers {
     use crate::domain::PlayerDataRepository;
     use crate::use_cases::GetAllPlayerDataUseCase;
-    use axum::body;
-    use axum::handler::Handler;
+    use axum::extract::State;
     use axum::http::StatusCode;
     use axum::response::{IntoResponse, Response};
     use std::sync::Arc;
@@ -193,15 +192,14 @@ mod infra_axum_handlers {
         }
     }
 
-    fn const_error_response() -> (StatusCode, Response) {
+    const fn const_error_response() -> (StatusCode, &'static str) {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Response::new(
-                body::boxed("Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string())),
+            "Encountered internal server error. Please contact the server administrator to resolve the issue.",
         )
     }
 
-    pub fn handle_get_metrics(state: SharedAppState) -> impl Handler<()> {
+    pub async fn handle_get_metrics(State(state): State<SharedAppState>) -> Response {
         // we need a separate handler function to create an error tracing span
         #[tracing::instrument]
         async fn handler(state: &SharedAppState) -> Response {
@@ -217,9 +215,7 @@ mod infra_axum_handlers {
                         &known_aggregated_player_data,
                     )
                 }) {
-                Ok(metrics_presentation) => {
-                    (StatusCode::OK, Response::new(metrics_presentation)).into_response()
-                }
+                Ok(metrics_presentation) => (StatusCode::OK, metrics_presentation).into_response(),
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     const_error_response().into_response()
@@ -227,7 +223,7 @@ mod infra_axum_handlers {
             }
         }
 
-        || async move { handler(&state).await }
+        handler(&state).await
     }
 }
 
@@ -238,7 +234,7 @@ mod infra_repository_impls {
         clippy::pedantic,
         clippy::derive_partial_eq_without_eq
     )]
-    mod buf_generated {
+    pub(crate) mod buf_generated {
         include!("gen/mod.rs");
     }
 
@@ -338,6 +334,11 @@ mod infra_repository_impls {
         pub(crate) fn game_data_client(&self) -> GameDataGrpcClient {
             self.client.clone()
         }
+
+        #[cfg(test)]
+        pub(crate) const fn from_client(client: GameDataGrpcClient) -> Self {
+            Self { client }
+        }
     }
 
     fn empty_request() -> tonic::Request<pbjson_types::Empty> {
@@ -411,6 +412,18 @@ mod app {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
 
+    pub fn build_router(shared_state: SharedAppState) -> axum::Router {
+        use infra_axum_handlers::handle_get_metrics;
+
+        use axum::routing::get;
+        use axum::Router;
+
+        Router::new()
+            .route("/metrics", get(handle_get_metrics))
+            .with_state(shared_state)
+            .layer(TraceLayer::new_for_http())
+    }
+
     pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // initialize tracing
         // see https://github.com/tokio-rs/axum/blob/79a0a54bc9f0f585c974b5e6793541baff980662/examples/tracing-aka-logging/src/main.rs
@@ -436,31 +449,312 @@ mod app {
             SharedAppState { repository }
         };
 
-        let app = {
-            use infra_axum_handlers::handle_get_metrics;
-
-            use axum::routing::get;
-            use axum::Router;
-
-            Router::new()
-                .route("/metrics", get(handle_get_metrics(shared_state.clone())))
-                .layer(TraceLayer::new_for_http())
-        };
+        let app = build_router(shared_state);
 
         let addr = {
             use std::net::SocketAddr;
             SocketAddr::from(([0, 0, 0, 0], 80))
         };
 
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+
         tracing::info!("listening on {}", addr);
 
-        Ok(axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await?)
+        Ok(axum::serve(listener, app).await?)
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app::main().await
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::{
+        Player, PlayerBreakCount, PlayerBuildCount, PlayerDataRepository, PlayerPlayTicks,
+        PlayerUuidString, PlayerVoteCount,
+    };
+
+    const TEST_UUID: &str = "00000000-0000-4000-8000-000000000001";
+
+    fn test_player() -> Player {
+        Player {
+            uuid: PlayerUuidString::from_string(&TEST_UUID.to_string()).unwrap(),
+        }
+    }
+
+    #[derive(Debug)]
+    struct FakeRepository;
+
+    #[async_trait::async_trait]
+    impl PlayerDataRepository for FakeRepository {
+        async fn get_all_break_counts(&self) -> anyhow::Result<Vec<PlayerBreakCount>> {
+            Ok(vec![PlayerBreakCount {
+                player: test_player(),
+                break_count: 10,
+            }])
+        }
+
+        async fn get_all_build_counts(&self) -> anyhow::Result<Vec<PlayerBuildCount>> {
+            Ok(vec![PlayerBuildCount {
+                player: test_player(),
+                build_count: 20,
+            }])
+        }
+
+        async fn get_all_play_ticks(&self) -> anyhow::Result<Vec<PlayerPlayTicks>> {
+            Ok(vec![PlayerPlayTicks {
+                player: test_player(),
+                play_ticks: 30,
+            }])
+        }
+
+        async fn get_all_vote_counts(&self) -> anyhow::Result<Vec<PlayerVoteCount>> {
+            Ok(vec![PlayerVoteCount {
+                player: test_player(),
+                vote_count: 40,
+            }])
+        }
+    }
+
+    #[derive(Debug)]
+    struct FailingRepository;
+
+    #[async_trait::async_trait]
+    impl PlayerDataRepository for FailingRepository {
+        async fn get_all_break_counts(&self) -> anyhow::Result<Vec<PlayerBreakCount>> {
+            Err(anyhow::anyhow!("repository is broken"))
+        }
+
+        async fn get_all_build_counts(&self) -> anyhow::Result<Vec<PlayerBuildCount>> {
+            Err(anyhow::anyhow!("repository is broken"))
+        }
+
+        async fn get_all_play_ticks(&self) -> anyhow::Result<Vec<PlayerPlayTicks>> {
+            Err(anyhow::anyhow!("repository is broken"))
+        }
+
+        async fn get_all_vote_counts(&self) -> anyhow::Result<Vec<PlayerVoteCount>> {
+            Err(anyhow::anyhow!("repository is broken"))
+        }
+    }
+
+    mod metrics_endpoint {
+        use super::{FailingRepository, FakeRepository, TEST_UUID};
+        use crate::app;
+        use crate::domain::PlayerDataRepository;
+        use crate::infra_axum_handlers::SharedAppState;
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use http_body_util::BodyExt;
+        use std::sync::Arc;
+        use tower::ServiceExt;
+
+        async fn get_metrics_response(
+            repository: Arc<dyn PlayerDataRepository>,
+        ) -> axum::response::Response {
+            app::build_router(SharedAppState { repository })
+                .oneshot(
+                    Request::builder()
+                        .uri("/metrics")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        }
+
+        #[tokio::test]
+        async fn returns_200_with_prometheus_metrics_when_repository_succeeds() {
+            let response = get_metrics_response(Arc::new(FakeRepository)).await;
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let body = std::str::from_utf8(&body).unwrap();
+
+            assert!(body.contains("# TYPE player_data gauge"));
+            for (kind, value) in [
+                ("break_count", 10),
+                ("build_count", 20),
+                ("play_ticks", 30),
+                ("vote_count", 40),
+            ] {
+                let expected =
+                    format!(r#"player_data{{uuid="{TEST_UUID}",kind="{kind}"}} {value}"#);
+                assert!(
+                    body.contains(&expected),
+                    "expected `{expected}` in:\n{body}"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn returns_500_when_repository_fails() {
+            let response = get_metrics_response(Arc::new(FailingRepository)).await;
+            assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    mod grpc_contract {
+        use crate::domain::PlayerDataRepository;
+        use crate::infra_repository_impls::buf_generated::gigantic_minecraft::seichi_game_data::v1 as generated;
+        use crate::infra_repository_impls::GameDataGrpcRepository;
+        use generated::read_service_client::ReadServiceClient;
+        use generated::read_service_server::{ReadService, ReadServiceServer};
+        use hyper_util::rt::TokioIo;
+        use tonic::transport::{Endpoint, Server, Uri};
+        use tonic::{Request, Response, Status};
+
+        fn generated_player() -> generated::Player {
+            generated::Player {
+                uuid: super::TEST_UUID.to_string(),
+                last_known_name: "steve".to_string(),
+            }
+        }
+
+        #[derive(Debug, Default)]
+        struct MockReadService;
+
+        #[tonic::async_trait]
+        impl ReadService for MockReadService {
+            async fn last_quits(
+                &self,
+                _: Request<pbjson_types::Empty>,
+            ) -> Result<Response<generated::LastQuitsResponse>, Status> {
+                Ok(Response::new(generated::LastQuitsResponse {
+                    results: vec![],
+                }))
+            }
+
+            async fn break_counts(
+                &self,
+                _: Request<pbjson_types::Empty>,
+            ) -> Result<Response<generated::BreakCountsResponse>, Status> {
+                Ok(Response::new(generated::BreakCountsResponse {
+                    results: vec![generated::PlayerBreakCount {
+                        player: Some(generated_player()),
+                        break_count: 42,
+                    }],
+                }))
+            }
+
+            async fn build_counts(
+                &self,
+                _: Request<pbjson_types::Empty>,
+            ) -> Result<Response<generated::BuildCountsResponse>, Status> {
+                Ok(Response::new(generated::BuildCountsResponse {
+                    results: vec![generated::PlayerBuildCount {
+                        player: Some(generated_player()),
+                        build_count: 43,
+                    }],
+                }))
+            }
+
+            async fn play_ticks(
+                &self,
+                _: Request<pbjson_types::Empty>,
+            ) -> Result<Response<generated::PlayTicksResponse>, Status> {
+                Ok(Response::new(generated::PlayTicksResponse {
+                    results: vec![generated::PlayerPlayTicks {
+                        player: Some(generated_player()),
+                        play_ticks: 44,
+                    }],
+                }))
+            }
+
+            async fn vote_counts(
+                &self,
+                _: Request<pbjson_types::Empty>,
+            ) -> Result<Response<generated::VoteCountsResponse>, Status> {
+                Ok(Response::new(generated::VoteCountsResponse {
+                    results: vec![generated::PlayerVoteCount {
+                        player: Some(generated_player()),
+                        vote_count: 45,
+                    }],
+                }))
+            }
+        }
+
+        /// tonic 公式の mock パターン (`tokio::io::duplex` + `connect_with_connector`) で
+        /// インプロセスの gRPC サーバーに接続したリポジトリを作る。
+        /// <https://github.com/hyperium/tonic/blob/master/examples/src/mock/mock.rs>
+        async fn connected_repository() -> GameDataGrpcRepository {
+            let (client_io, server_io) = tokio::io::duplex(64 * 1024);
+
+            tokio::spawn(async move {
+                Server::builder()
+                    .add_service(ReadServiceServer::new(MockReadService))
+                    .serve_with_incoming(tokio_stream::once(Ok::<_, std::io::Error>(server_io)))
+                    .await
+            });
+
+            let mut client_io = Some(client_io);
+            let channel = Endpoint::try_from("http://mock.invalid")
+                .unwrap()
+                .connect_with_connector(tower::service_fn(move |_: Uri| {
+                    let io = client_io.take();
+                    async move {
+                        io.map(TokioIo::new)
+                            .ok_or_else(|| std::io::Error::other("duplex client already consumed"))
+                    }
+                }))
+                .await
+                .unwrap();
+
+            GameDataGrpcRepository::from_client(ReadServiceClient::new(channel))
+        }
+
+        #[tokio::test]
+        async fn get_all_break_counts_maps_grpc_response_to_domain() {
+            let result = connected_repository()
+                .await
+                .get_all_break_counts()
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].player.uuid.as_str().unwrap(), super::TEST_UUID);
+            assert_eq!(result[0].break_count, 42);
+        }
+
+        #[tokio::test]
+        async fn get_all_build_counts_maps_grpc_response_to_domain() {
+            let result = connected_repository()
+                .await
+                .get_all_build_counts()
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].player.uuid.as_str().unwrap(), super::TEST_UUID);
+            assert_eq!(result[0].build_count, 43);
+        }
+
+        #[tokio::test]
+        async fn get_all_play_ticks_maps_grpc_response_to_domain() {
+            let result = connected_repository()
+                .await
+                .get_all_play_ticks()
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].player.uuid.as_str().unwrap(), super::TEST_UUID);
+            assert_eq!(result[0].play_ticks, 44);
+        }
+
+        #[tokio::test]
+        async fn get_all_vote_counts_maps_grpc_response_to_domain() {
+            let result = connected_repository()
+                .await
+                .get_all_vote_counts()
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].player.uuid.as_str().unwrap(), super::TEST_UUID);
+            assert_eq!(result[0].vote_count, 45);
+        }
+    }
 }

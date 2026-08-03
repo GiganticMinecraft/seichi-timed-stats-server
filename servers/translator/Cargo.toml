@@ -4,16 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.5.17"
+axum = "0.8.9"
 async-trait = "0.1.80"
-pbjson-types = "0.5.1"
-prost = "0.11.8"
+pbjson-types = "0.9.0"
+prost = "0.14.4"
 tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread"] }
-tonic = { version = "0.9.1", features = ["gzip"] }
+tonic = { version = "0.14.6", features = ["gzip"] }
+tonic-prost = "0.14.6"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing = "0.1.39"
 anyhow = "1.0.82"
 envy = "0.4.2"
 serde = "1.0.198"
-tower-http = { version = "0.4.4", features = ["trace"] }
+tower-http = { version = "0.7.0", features = ["trace"] }
 indexmap = "2.0.0"
+
+[dev-dependencies]
+http-body-util = "0.1.4"
+hyper-util = { version = "0.1.20", features = ["tokio"] }
+tokio = { version = "1.37.0", features = ["io-util", "macros", "rt-multi-thread"] }
+tokio-stream = "0.1.19"
+tower = { version = "0.5.3", features = ["util"] }

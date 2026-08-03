@@ -12,10 +12,10 @@ plugins:
       - extern_path=.google.protobuf=::pbjson_types
       - file_descriptor_set
   # https://github.com/neoeinstein/protoc-gen-prost/tree/main/protoc-gen-tonic
+  # (サーバースタブはテスト用モック gRPC サーバーの実装に使う)
   - local: protoc-gen-tonic
     out: src/gen
     opt:
-      - no_server=true
       - compile_well_known_types
       - extern_path=.google.protobuf=::pbjson_types
   # https://github.com/neoeinstein/protoc-gen-prost/tree/main/protoc-gen-prost-crate
