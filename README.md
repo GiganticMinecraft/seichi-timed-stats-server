@@ -21,8 +21,10 @@ reader / translator のビルド (`cargo build` 等) には、Rust ツールチ�
 - protoc — 依存クレート (pbjson-types など) のビルドに必要です (例: `brew install protobuf`)
 - buf が使う protoc プラグイン — **PATH 上のバイナリがそのまま使われるため、
   バージョン違いのプラグインが入っていると互換性のない生成コードでビルドが壊れます。**
-  必ず同梱のスクリプトでインストールしてください (reader / translator で共通):
+  必ずビルド対象サーバーのスクリプトでインストールしてください
+  (バージョンは各サーバーの依存世代に合わせて独立に管理されています):
 
   ```sh
-  ./servers/reader/install-buf-plugins.sh
+  ./servers/reader/install-buf-plugins.sh      # reader をビルドする場合
+  ./servers/translator/install-buf-plugins.sh  # translator をビルドする場合
   ```
