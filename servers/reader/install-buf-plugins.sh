@@ -5,6 +5,6 @@
 set -eu
 
 exec cargo install --locked \
-  protoc-gen-prost@0.2.3 \
-  protoc-gen-tonic@0.3.0 \
-  protoc-gen-prost-crate@0.3.1
+  protoc-gen-prost@0.5.0 \
+  protoc-gen-tonic@0.5.0 \
+  protoc-gen-prost-crate@0.5.0

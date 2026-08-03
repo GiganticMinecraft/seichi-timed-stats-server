@@ -15,7 +15,7 @@ mod domain {
     pub struct PlayerUuidString([u8; 36]);
 
     impl PlayerUuidString {
-        pub fn as_str(&self) -> Result<&str, Utf8Error> {
+        pub const fn as_str(&self) -> Result<&str, Utf8Error> {
             std::str::from_utf8(&self.0)
         }
 
@@ -109,22 +109,22 @@ mod use_cases {
                 IndexMap::with_capacity(break_counts.len());
 
             for break_count in break_counts {
-                let mut entry = result_map.entry(break_count.player).or_default();
+                let entry = result_map.entry(break_count.player).or_default();
                 entry.break_count = break_count.break_count;
             }
 
             for build_count in build_counts {
-                let mut entry = result_map.entry(build_count.player).or_default();
+                let entry = result_map.entry(build_count.player).or_default();
                 entry.build_count = build_count.build_count;
             }
 
             for tick_count in play_ticks {
-                let mut entry = result_map.entry(tick_count.player).or_default();
+                let entry = result_map.entry(tick_count.player).or_default();
                 entry.play_ticks = tick_count.play_ticks;
             }
 
             for vote_count in vote_counts {
-                let mut entry = result_map.entry(vote_count.player).or_default();
+                let entry = result_map.entry(vote_count.player).or_default();
                 entry.vote_count = vote_count.vote_count;
             }
 
@@ -136,8 +136,7 @@ mod use_cases {
 mod infra_axum_handlers {
     use crate::domain::PlayerDataRepository;
     use crate::use_cases::GetAllPlayerDataUseCase;
-    use axum::body;
-    use axum::handler::Handler;
+    use axum::extract::State;
     use axum::http::StatusCode;
     use axum::response::{IntoResponse, Response};
     use std::sync::Arc;
@@ -193,15 +192,14 @@ mod infra_axum_handlers {
         }
     }
 
-    fn const_error_response() -> (StatusCode, Response) {
+    const fn const_error_response() -> (StatusCode, &'static str) {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Response::new(
-                body::boxed("Encountered internal server error. Please contact the server administrator to resolve the issue.".to_string())),
+            "Encountered internal server error. Please contact the server administrator to resolve the issue.",
         )
     }
 
-    pub fn handle_get_metrics(state: SharedAppState) -> impl Handler<()> {
+    pub async fn handle_get_metrics(State(state): State<SharedAppState>) -> Response {
         // we need a separate handler function to create an error tracing span
         #[tracing::instrument]
         async fn handler(state: &SharedAppState) -> Response {
@@ -217,9 +215,7 @@ mod infra_axum_handlers {
                         &known_aggregated_player_data,
                     )
                 }) {
-                Ok(metrics_presentation) => {
-                    (StatusCode::OK, Response::new(metrics_presentation)).into_response()
-                }
+                Ok(metrics_presentation) => (StatusCode::OK, metrics_presentation).into_response(),
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     const_error_response().into_response()
@@ -227,7 +223,7 @@ mod infra_axum_handlers {
             }
         }
 
-        || async move { handler(&state).await }
+        handler(&state).await
     }
 }
 
@@ -443,7 +439,8 @@ mod app {
             use axum::Router;
 
             Router::new()
-                .route("/metrics", get(handle_get_metrics(shared_state.clone())))
+                .route("/metrics", get(handle_get_metrics))
+                .with_state(shared_state)
                 .layer(TraceLayer::new_for_http())
         };
 
@@ -452,11 +449,11 @@ mod app {
             SocketAddr::from(([0, 0, 0, 0], 80))
         };
 
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+
         tracing::info!("listening on {}", addr);
 
-        Ok(axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await?)
+        Ok(axum::serve(listener, app).await?)
     }
 }
 
