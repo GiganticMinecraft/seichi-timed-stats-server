@@ -10,3 +10,19 @@
 ## アーキテクチャ俯瞰図
 
 ![architecture](./docs/images/architecture.drawio.svg)
+
+## 開発環境のセットアップ
+
+reader / translator のビルド (`cargo build` 等) には、Rust ツールチェイン (バージョンは各サーバーの
+`rust-toolchain.toml` を参照) に加えて次のツールが必要です。
+
+- [buf CLI](https://buf.build/docs/installation) — build.rs がコード生成に使います
+  (バージョンは Dockerfile の `bufbuild/buf` イメージに揃えることを推奨)
+- protoc — 依存クレート (pbjson-types など) のビルドに必要です (例: `brew install protobuf`)
+- buf が使う protoc プラグイン — **PATH 上のバイナリがそのまま使われるため、
+  バージョン違いのプラグインが入っていると互換性のない生成コードでビルドが壊れます。**
+  必ず同梱のスクリプトでインストールしてください (reader / translator で共通):
+
+  ```sh
+  ./servers/reader/install-buf-plugins.sh
+  ```

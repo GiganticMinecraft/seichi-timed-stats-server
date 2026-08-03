@@ -1,7 +1,7 @@
 version: v2
 # 各プラグインは crates.io の protoc-gen-prost / protoc-gen-tonic / protoc-gen-prost-crate を
 # ローカルにインストールして使う (BSR のリモートプラグイン実行はレート制限が厳しいため使わない)。
-# インストールするバージョンは CI (build-and-release-application.yaml) と Dockerfile を参照。
+# インストールは同ディレクトリの install-buf-plugins.sh で行う (バージョンはそこで固定)。
 plugins:
   # https://github.com/neoeinstein/protoc-gen-prost/tree/main/protoc-gen-prost#options
   - local: protoc-gen-prost
