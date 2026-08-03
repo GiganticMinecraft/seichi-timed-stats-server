@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.23
+# syntax=docker/dockerfile:1
 FROM lukemathwalker/cargo-chef:0.1.77-rust-1.97.1 AS chef
 WORKDIR /app
 
@@ -6,7 +6,7 @@ FROM chef AS planner
 COPY --link . .
 RUN cargo chef prepare --recipe-path recipe.json
 
-FROM bufbuild/buf:1.72.0 as buf
+FROM bufbuild/buf:1.72.0 AS buf
 
 FROM chef AS build-env
 COPY --from=buf --link /usr/local/bin/buf /usr/local/bin/
